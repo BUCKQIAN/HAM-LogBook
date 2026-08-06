@@ -29,6 +29,10 @@ CLAUDE.md
 .DS_Store
 Thumbs.db
 
+# ===== IDE 配置（不传）=====
+.vscode/
+.idea/
+
 # ===== 日志 =====
 *.log
 npm-debug.log*
