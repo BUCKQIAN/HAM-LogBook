@@ -1,4 +1,4 @@
-# HAM Logbook 📡 业余无线电通联日志
+# HAM Logbook 📡 业余无线电通联日志 - Android
 
 面向中国业余无线电爱好者（HAM）的 **Android 离线日志软件**。记录每一次通联（QSO），支持野外无网络环境使用；联网后可通过 HamQTH 一键补全对方呼号资料。日志时间统一使用 **UTC**，可导出标准 **ADIF 3.1.4** 格式，兼容 Logger32、N1MM、Wavelog 等主流日志系统。
 
