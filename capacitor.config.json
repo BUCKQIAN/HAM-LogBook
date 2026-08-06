@@ -1,0 +1,13 @@
+{
+  "appId": "xin.anji.hamlogbook",
+  "appName": "HAM Logbook",
+  "webDir": "src",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

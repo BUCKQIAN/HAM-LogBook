@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>HAM Logbook - 历史记录</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/theme.js"></script>
+</head>
+<body>
+
+  <!-- 顶部标题栏 -->
+  <div class="top-bar">
+    <div class="top-bar-copy"><span class="top-brand">HAM LOGBOOK</span><h1>历史记录</h1></div>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换主题">☾</button>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 内容区 -->
+  <div class="content">
+
+    <!-- 搜索栏 -->
+    <div class="card">
+      <div class="card-content">
+        <div class="search-bar">
+          <div class="field-row">
+            <div class="field field-wide">
+              <label for="search-callsign">呼号</label>
+              <input class="uppercase-input" type="text" id="search-callsign" placeholder="例如 BH4ABC" autocomplete="off" autocapitalize="characters">
+            </div>
+            <div class="field">
+              <label for="search-date-from">开始日期</label>
+              <input type="text" id="search-date-from" placeholder="YY/MM/DD" maxlength="8" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="search-date-to">结束日期</label>
+              <input type="text" id="search-date-to" placeholder="YY/MM/DD" maxlength="8" autocomplete="off">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="search-band">频段</label>
+              <select id="search-band">
+                <option value="">全部</option>
+                <option value="2m">2m</option>
+                <option value="70cm">70cm</option>
+                <option value="6m">6m</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="search-mode">模式</label>
+              <select id="search-mode">
+                <option value="">全部</option>
+                <option value="FM">FM</option>
+                <option value="SSB">SSB</option>
+                <option value="FT8">FT8</option>
+                <option value="FT4">FT4</option>
+                <option value="CW">CW</option>
+                <option value="RTTY">RTTY</option>
+                <option value="AM">AM</option>
+              </select>
+            </div>
+            <div class="field search-actions">
+              <label>&nbsp;</label>
+              <div class="btn-inline-row no-wrap">
+                <button class="btn-small" id="search-btn">搜索</button>
+                <button class="btn-small" id="reset-search-btn">重置</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QSO 列表 -->
+    <div class="qso-list" id="qso-list">
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">暂无 QSO 记录</div>
+      </div>
+    </div>
+
+    <!-- 统计栏 -->
+    <div class="stats-bar">
+      <div class="stat-item">本月通联：<span class="stat-value" id="stat-monthly">0</span></div>
+      <div class="stat-item">累计通联：<span class="stat-value" id="stat-total">0</span></div>
+      <div class="stat-item stat-wide">频段分布：<span class="stat-value" id="stat-bands">暂无数据</span></div>
+    </div>
+
+  </div>
+
+  <!-- 底部导航栏容器 -->
+  <div id="nav-container"></div>
+
+  <!-- Capacitor 原生插件桥接 -->
+  <script type="module" src="js/vendor/capacitor-bridge.js"></script>
+  <script type="module" src="js/nav.js"></script>
+  <script type="module">
+    import { initPage } from './js/history.js';
+    document.addEventListener('DOMContentLoaded', initPage);
+  </script>
+
+</body>
+</html>

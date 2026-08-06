@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>HAM Logbook - 新建 QSO</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/theme.js"></script>
+</head>
+<body>
+
+  <!-- 顶部标题栏 -->
+  <div class="top-bar">
+    <div class="top-bar-copy"><span class="top-brand">HAM LOGBOOK</span><h1>新建 QSO</h1></div>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换主题">☾</button>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 内容区 -->
+  <div class="content">
+
+    <!-- 卡片1: 通联时间 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">通联时间</span>
+      </div>
+      <div class="card-content">
+        <p class="helper-text">日志日期与时间统一使用 UTC，便于与 ADIF 及国际日志系统互换。</p>
+        <div class="field-row">
+          <div class="field">
+            <label for="qso-date">日期</label>
+            <input type="text" id="qso-date" placeholder="YY/MM/DD" maxlength="8" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="time-on">打开时间</label>
+            <input type="text" id="time-on" placeholder="HH:MM:SS" maxlength="8" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="time-off">关闭时间</label>
+            <input type="text" id="time-off" placeholder="HH:MM:SS" maxlength="8" autocomplete="off">
+          </div>
+        </div>
+        <button class="btn-small btn-wide" id="utc-time-btn">⏱ 更新当前 UTC 时间</button>
+        <div class="field">
+          <label for="callsign">呼号 *</label>
+          <div class="callsign-row">
+            <input class="uppercase-input" type="text" id="callsign" placeholder="例如 BH4ABC/P" autocomplete="off" autocapitalize="characters">
+            <button class="btn-icon" id="lookup-btn" title="查询呼号">🔍</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片2: 信号和频率 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">信号和频率</span>
+      </div>
+      <div class="card-content">
+        <div class="field-row">
+          <div class="field">
+            <label for="mode">模式</label>
+            <select id="mode">
+              <option value="FM">FM</option>
+              <option value="SSB">SSB</option>
+              <option value="FT8">FT8</option>
+              <option value="FT4">FT4</option>
+              <option value="CW">CW</option>
+              <option value="RTTY">RTTY</option>
+              <option value="AM">AM</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="band">频段</label>
+            <select id="band">
+              <option value="">选择频段</option>
+              <option value="2m">2m</option><option value="70cm">70cm</option>
+              <option value="6m">6m</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="frequency">频率 (MHz)</label>
+            <input type="number" id="frequency" step="0.001" inputmode="decimal" placeholder="144.370" min="0">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="rst-sent">我方发送（RST_SENT）</label>
+            <input type="text" id="rst-sent" placeholder="59" maxlength="3" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="rst-rcvd">我方接收（RST_RCVD）</label>
+            <input type="text" id="rst-rcvd" placeholder="59" maxlength="3" autocomplete="off">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片3: 通联信息 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">通联信息</span>
+      </div>
+      <div class="card-content">
+        <div class="field-row">
+          <div class="field">
+            <label for="their-rig">对方设备</label>
+            <input type="text" id="their-rig" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="their-antenna">对方天线</label>
+            <input type="text" id="their-antenna" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="their-power">对方功率</label>
+            <input type="text" id="their-power" autocomplete="off">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="op-qth">对方位置</label>
+            <input type="text" id="op-qth" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="op-name">对方姓名 <span class="optional-note">非必填</span></label>
+            <input type="text" id="op-name" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="op-locator">网格坐标 <span class="optional-note">非必填</span></label>
+            <input class="uppercase-input" type="text" id="op-locator" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="my-power">我的功率</label>
+            <input type="text" id="my-power" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="my-rig">我的设备</label>
+            <input type="text" id="my-rig" list="my-rigs-list" autocomplete="off">
+            <datalist id="my-rigs-list"></datalist>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片4: 我的位置 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">我的位置</span>
+      </div>
+      <div class="card-content">
+        <div class="field-row">
+          <div class="field">
+            <label for="my-lat">纬度</label>
+            <input type="text" id="my-lat" placeholder="例 31.2304" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="my-lon">经度</label>
+            <input type="text" id="my-lon" placeholder="例 121.4737" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="my-alt">海拔 (m)</label>
+            <input type="text" id="my-alt" inputmode="decimal" autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label for="my-locator">网格坐标</label>
+          <input class="uppercase-input" type="text" id="my-locator" placeholder="根据经纬度自动计算" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        </div>
+        <div class="btn-row">
+          <button class="btn-small" id="gps-btn">📍 获取当前位置</button>
+          <button class="btn-small" id="default-loc-btn">🏠 使用默认位置</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片5: 备注 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">备注</span>
+      </div>
+      <div class="card-content">
+        <div class="field">
+          <textarea id="notes" rows="3" placeholder="例如：首次通联，信号稳定；POTA CN-0001"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部操作区 -->
+    <div class="action-bar">
+      <button class="btn btn-primary" id="save-btn">💾 保存 QSO</button>
+      <button class="btn btn-danger is-hidden" id="delete-btn">🗑️ 删除 QSO</button>
+      <button class="btn btn-secondary" id="clear-btn">清除表单</button>
+    </div>
+
+  </div>
+
+  <!-- 底部导航栏容器 -->
+  <div id="nav-container"></div>
+
+  <!-- Capacitor 原生插件桥接 -->
+  <script type="module" src="js/vendor/capacitor-bridge.js"></script>
+  <script type="module" src="js/nav.js"></script>
+  <script type="module">
+    import { initPage } from './js/app.js';
+    document.addEventListener('DOMContentLoaded', initPage);
+  </script>
+
+</body>
+</html>

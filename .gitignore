@@ -1,0 +1,34 @@
+# ===== 依赖（不传）=====
+node_modules/
+
+# ===== 构建产物（不传）=====
+dist/
+build/
+
+# ===== APK 安装包（不传）=====
+*.apk
+*.aab
+
+# ===== Gradle 缓存（不传）=====
+.gradle/
+android/.gradle
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+
+# ===== 个人开发文档（不传，仅本地保留）=====
+XiaobaiDev.md
+ForMe.md
+AGENTS.md
+CLAUDE.md
+
+# ===== Capacitor 生成（android/ 是否上传见 XiaobaiDev.md 说明）=====
+
+# ===== 系统文件（不传）=====
+.DS_Store
+Thumbs.db
+
+# ===== 日志 =====
+*.log
+npm-debug.log*
