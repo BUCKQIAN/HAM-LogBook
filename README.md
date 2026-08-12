@@ -1,154 +1,160 @@
-# HAM Logbook 📡 业余无线电通联日志 - Android
-### 一个免费、开源、面对新火腿的 Android 业余无线电通联日志软件
+# HAM Logbook 📡
 
-面向中国业余无线电爱好者（HAM）的 **Android 离线日志软件**。记录每一次通联（QSO），支持野外无网络环境使用；联网后可通过 HamQTH 一键补全对方呼号资料。日志时间统一使用 **UTC**，可导出标准 **ADIF 3.1.4** 格式，兼容 Logger32、N1MM、Wavelog 等主流日志系统。
+### 面向中国业余无线电爱好者的 Android 离线通联日志
 
-> **离线优先 · 隐私安全 · 零依赖 GMS · 开源免费**
+HAM Logbook 用于记录业余无线电通联（QSO）。核心功能可完全离线使用；联网后可选用 HamQTH 补全对方呼号资料。日志统一使用 UTC，并可导入、导出标准 ADIF 3.1.4 文件，兼容 Logger32、N1MM、Wavelog 等常见日志软件。
 
-## ✨ 功能特性
+> **离线优先 · 数据加密 · 不依赖 GMS · GPL-3.0 开源**
+
+## ✨ 功能
 
 | 类别 | 说明 |
-|------|------|
-| 📡 **离线优先** | 所有核心功能无需网络即可使用，野外通联无障碍 |
-| 🔍 **呼号查询** | HamQTH 免费 API，一键补全对方姓名、位置、网格坐标 |
-| 📍 **无 GMS 定位** | 使用 Android WebView 系统定位，**不依赖 Google Play 服务**（国产手机可用） |
-| ⏱ **UTC 日志** | 打开/关闭时间默认 UTC 标准时，一键刷新，符合国际日志规范 |
-| 📶 **中继台管理** | 手动录入常用中继台（收发频率 + 收发亚音），一键应用到通联表单 |
-| 📤 **ADIF 导入/导出** | 标准 ADIF 3.1.4 格式，兼容 Logger32 / N1MM / Wavelog |
-| 💾 **SQLite 存储** | 所有数据存于应用私有空间，不上传任何服务器 |
-| ◐ **昼夜主题** | 纸张与墨色风格，支持白昼 / 黑夜模式切换 |
-| 🖼️ **原生启动页** | 五种 Android 原生启动风格；Android 12+ 冷启动直接使用所选系统主题，Android 11 及以下由中性首帧无闪烁过渡 |
+|---|---|
+| 📡 离线通联日志 | 创建、编辑、搜索和管理 QSO；日期与时间统一使用 UTC。 |
+| 🔍 呼号资料 | 可选配置 HamQTH，一键补全对方姓名、QTH 和网格坐标；未配置账号时不影响离线记录。 |
+| 📻 频段与中继 | 根据中国大陆 A/B/C 类操作证类别显示可用频段；管理中继台收发频率与 CTCSS/DCS 亚音。 |
+| 🗂️ 历史复用 | 输入呼号后可查询既往通联资料，并带入姓名、设备、天线、功率、地址等字段。 |
+| 📥📤 ADIF | 导入、导出和系统分享 ADIF 3.1.4；导出可选文件夹，支持每日自动滚动备份。 |
+| 🔐 数据安全 | QSO 数据库使用 SQLCipher 加密；HamQTH 凭据和 QSO 草稿使用 Android Keystore 保护。 |
+| 📍 定位与网格 | 使用 Android WebView 定位能力获取位置、海拔和 Maidenhead 网格，不依赖 Google Play 服务。 |
+| ◐ 外观与启动页 | 支持白昼/黑夜主题及多种原生启动页风格。 |
 
-## 🖥️ 环境要求
+## 🔒 隐私与数据说明
 
-- **Android 8.0+**（API 26 及以上；构建时 `minSdk 22`）
-- 无需 Google Play 服务
-- 支持国产 Android 手机 / 平板
+- 所有 QSO 数据保存在应用私有空间，不上传至本项目服务器。
+- ADIF 是开放、未加密的交换格式；请导出至可信的私人目录。
+- 导出 ADIF 默认不含精确经纬度，但保留网格坐标；如确有需要可在设置中主动开启。
+- 个人信息备份可使用口令加密，包含中继台、台站呼号、操作证类别、默认 QTH、HamQTH 用户名和设备预设；不包含 QSO 日志和 HamQTH 密码。
+- Android 系统自动备份已关闭。卸载应用、清除应用数据或设备损坏均可能造成日志丢失，请在升级、换机前导出 ADIF 和个人信息备份。
+
+## 📱 使用要点
+
+### HamQTH 呼号查询
+
+1. 在 [HamQTH](https://www.hamqth.com/) 注册账号。
+2. 在应用中进入 **设置 → 呼号查询与数据管理**，填写用户名和密码。
+3. 回到新建 QSO 页面，输入呼号并点击查询按钮。
+
+HamQTH 密码仅存放在 Android Keystore 中，不会写入个人信息备份。
+
+### ADIF 导入、导出与备份
+
+- 在 **设置 → 呼号查询与数据管理** 中选择 ADIF 导出文件夹；系统会保存该文件夹授权。
+- 可导出 ADIF、分享日志，或导入 `.adi` / `.adif` 文件。
+- 自动备份每天最多生成一份，滚动保留最近 7 份。
+- 大型 ADIF 采用流式解析、分批写入和整文件事务；导入失败会回滚。本应用限制单个导入文件最大 256 MB、最多 100 万条记录。
+
+### 升级至 v1.1.0
+
+- 请直接覆盖安装，不要先卸载旧版，以保留数据。
+- 首次启动时，旧版本的明文日志数据库会原地迁移至 SQLCipher 加密数据库；日志较多时请耐心等待。
+- 完成迁移后不建议降级到旧版，因为旧版可能无法读取加密后的数据库。
 
 ## 🛠️ 技术栈
 
-- **框架**：[Capacitor 5.x](https://capacitorjs.com/)（WebView 容器）
-- **前端**：原生 HTML5 + CSS3 + Vanilla JavaScript（**零框架、零 CDN**，野外离线不失效）
-- **数据库**：SQLite（[@capacitor-community/sqlite](https://github.com/capacitor-community/sqlite) 5.x）
-- **定位**：`navigator.geolocation` Web API（免 GMS）
-- **主题**：CSS 变量 + `data-theme`，昼夜双模式
+- **容器框架**：[Capacitor 8.5](https://capacitorjs.com/)
+- **前端**：HTML5、CSS3、Vanilla JavaScript（无框架、无 CDN）
+- **数据库**：SQLite / SQLCipher（[`@capacitor-community/sqlite` 8.1](https://github.com/capacitor-community/sqlite)）
+- **原生平台**：Android，`minSdk 24`（Android 7.0+）、`compileSdk` / `targetSdk` 36
+- **定位**：`navigator.geolocation` Web API
 
-## 📦 快速开始
+## 🚀 开发与构建
 
-### 环境准备
+### 环境要求
 
-| 依赖 | 版本要求 |
-|------|---------|
-| Node.js | 18+ |
-| JDK | 17+（本仓库实测 JDK 21 可用） |
-| Android SDK | `platforms;android-33` + `build-tools;33.0.0`（无需 Android Studio GUI） |
+| 依赖 | 版本 |
+|---|---|
+| Node.js | 22+ |
+| JDK | 17+ |
+| Android SDK | Android API 36（并安装相应 Build Tools） |
 
-### 安装与打包
+Android 原生工程已经提交到仓库，首次克隆后**不需要**执行 `npx cap add android`。
 
 ```bash
-# 1. 安装依赖
-npm install
+# 安装 JavaScript 依赖
+npm ci
 
-# 2. 首次生成 Android 原生工程
-npx cap add android
+# 运行单元测试
+npm test
 
-# 3. 同步 Web 资源到 Android 工程
-npx cap sync
+# 将 Web 资源和 Capacitor 配置同步到 Android 工程
+npm run sync
 
-# 4. 打包 Debug APK
+# 构建 Debug APK
 cd android
 ./gradlew assembleDebug
-
-# APK 输出路径：
-# android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-> 💡 国内网络建议在 `android/gradle/wrapper/gradle-wrapper.properties` 中
-> 将 `distributionUrl` 指向腾讯云镜像（本仓库已配置）：
-> `https://mirrors.cloud.tencent.com/gradle/gradle-8.5-bin.zip`
+Debug APK 位于：
 
-### 安装到手机
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+安装到已开启 USB 调试的设备：
 
 ```bash
-# USB 连接手机（开启开发者模式 + USB 调试）
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-或者直接复制 APK 到手机点击安装。
+### 正式版签名
 
-## 📱 使用说明
+真实签名材料绝不能提交到 Git。复制 `android/keystore.properties.example` 为 `android/keystore.properties` 后填写本机签名信息，或设置下列环境变量：
 
-### HamQTH 呼号查询配置
+```text
+HAMLOG_RELEASE_STORE_FILE
+HAMLOG_RELEASE_STORE_PASSWORD
+HAMLOG_RELEASE_KEY_ALIAS
+HAMLOG_RELEASE_KEY_PASSWORD
+```
 
-1. 访问 [hamqth.com](https://www.hamqth.com/) 免费注册账号
-2. App 内进入 **设置 → 呼号查询源（HamQTH）**，填入用户名和密码
-3. 回到首页，输入呼号后点击 🔍 按钮即可查询
+缺少完整签名配置时，Release 构建会主动失败，避免误发布错误签名的安装包。
 
-> 未配置 HamQTH 账号不影响任何离线功能，仅停用联网查询。
+## 🔒 Android 权限
 
-### 时间规范
+| 权限 | 用途 | 申请方式 |
+|---|---|---|
+| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | 获取当前位置、海拔和网格坐标 | 需要使用定位时由 Android 授权 |
+| `INTERNET` | 可选的 HamQTH 呼号查询 | 安装时静默授予 |
 
-- 日志日期与时间统一使用 **UTC**（北京时间 -8 小时）
-- 首页一键「⏱ 更新当前 UTC 时间」，无需手动换算
-
-### ADIF 导出
-
-- 设置 → 数据管理 → 导出 ADIF
-- 首次导出时通过 Android 系统界面选择目标文件夹，应用会保存该文件夹的访问授权
-- 之后可在设置页随时更换导出文件夹；文件名包含导出时间，同名时会自动追加序号，不覆盖已有备份
-- “分享日志”会生成临时 ADIF 文件并打开系统分享面板，可发送给 Logger32 / N1MM / Wavelog
-- 大型日志会分批读取和写入，历史页也按游标分页，避免长期使用后一次性占用大量内存
-- 个人信息可单独备份和恢复；HamQTH 密码由 Android Keystore 加密保存且不会写入备份
-- QSO 数据库使用 SQLCipher 加密；升级旧版本时会自动迁移原有日志
-
-## 🔒 权限说明
-
-| 权限 | 用途 | 申请时机 |
-|------|------|---------|
-| `ACCESS_FINE_LOCATION` / `COARSE` | 获取当前位置、海拔、网格坐标 | **首次启动时**统一申请 |
-| `INTERNET` | HamQTH 呼号查询 | 静默授予 |
-
-ADIF 导入和导出使用 Android 系统文件选择器及文件夹持久授权，不申请整盘存储权限。
+ADIF 导入、导出使用 Android 系统文件选择器及持久文件夹授权，不申请整盘存储权限。
 
 ## 📁 项目结构
 
-```
-ham-logbook/
-├── package.json              # 依赖与脚本（type: module）
-├── capacitor.config.json     # Capacitor 配置（CapacitorHttp 已开启）
-├── src/                      # Web 前端（Capacitor webDir）
-│   ├── index.html            # 新建 QSO（首页）
-│   ├── history.html          # 历史记录 / 搜索 / 统计
-│   ├── repeater.html         # 中继台管理
-│   ├── settings.html         # 设置 / 导入导出 / 关于
-│   ├── css/style.css         # 全局样式（深/浅双主题，纯手写）
+```text
+HAM-LogBook/
+├── src/                         # Web 前端资源
+│   ├── index.html               # 新建 QSO
+│   ├── history.html             # 历史记录与搜索
+│   ├── repeater.html            # 中继台管理
+│   ├── settings*.html           # 设置、台站资料、数据管理和启动页
+│   ├── css/style.css            # 全局样式与主题
 │   └── js/
-│       ├── app.js            # 首页逻辑（表单 / 验证 / 保存）
-│       ├── db.js             # SQLite 封装（单例）
-│       ├── adif.js           # ADIF 3.1.4 解析 / 生成
-│       ├── hamqth.js         # HamQTH API（Session 管理 / 超时重试）
-│       ├── gps.js            # Web 定位封装
-│       ├── locator.js        # Maidenhead 网格计算
-│       ├── radio.js          # 频段识别 / 亚音校验
-│       ├── theme.js          # 昼夜主题管理
-│       ├── splash.js         # 启动页风格设置
-│       └── vendor/           # Capacitor 插件本地化（import map 兼容）
-└── android/                  # Android 原生工程（Capacitor 生成）
-    └── app/src/main/java/... # MainActivity + NativeSplash 插件
+│       ├── app.js               # QSO 表单、保存与草稿
+│       ├── db.js                # 加密 SQLite 数据库与迁移
+│       ├── adif.js              # ADIF 解析与生成
+│       ├── automatic-backup.js  # 每日 ADIF 备份
+│       ├── secure-data.js       # Keystore 安全数据桥接
+│       └── vendor/              # 本地化 Capacitor 插件模块
+├── android/                     # Android 原生工程与自定义插件
+├── tests/                       # Node.js 单元测试
+├── package.json
+└── capacitor.config.json
 ```
 
 ## 🤝 贡献
 
-欢迎提交 Issue 与 Pull Request。请保持：
+欢迎提交 Issue 和 Pull Request。请遵循以下约定：
 
-- 纯 Vanilla JS，**不引入框架与 CDN**
-- 所有样式写在 `src/css/style.css`
-- `localStorage` key 统一使用 `hamlog_` 前缀
-- 代码注释使用中文
+- 保持 Vanilla JavaScript，不引入框架或 CDN。
+- 全局样式集中在 `src/css/style.css`。
+- `localStorage` 键名使用 `hamlog_` 前缀。
+- 不提交真实密钥、签名文件、环境变量、APK、构建产物、用户数据或个人笔记。
+- 提交前运行 `npm test`。
 
 ## 📄 License
 
-本项目基于 **GNU GPL v3.0** 开源协议发布，详见 [LICENSE](LICENSE)。
+本项目基于 [GNU GPL v3.0](LICENSE) 开源协议发布。
 
 ---
 
