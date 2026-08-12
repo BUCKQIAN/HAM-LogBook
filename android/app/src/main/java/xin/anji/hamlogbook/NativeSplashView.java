@@ -17,6 +17,11 @@ public class NativeSplashView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final float density;
 
+    /** 供 Android 布局工具和预览实例化；运行时会使用带 style 的构造器。 */
+    public NativeSplashView(Context context) {
+        this(context, "A");
+    }
+
     public NativeSplashView(Context context, String style) {
         super(context);
         this.style = style == null ? "A" : style;

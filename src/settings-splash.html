@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>HAM Logbook - 启动页风格</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/theme.js"></script>
+</head>
+<body data-settings-page="splash">
+
+  <div class="top-bar">
+    <div class="top-bar-copy"><span class="top-brand">HAM LOGBOOK</span><h1>启动页风格</h1></div>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换主题">☾</button>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div class="content">
+    <a class="settings-back-link" href="settings.html">‹ 返回设置</a>
+
+    <div class="settings-section">
+      <h3>外观</h3>
+      <div class="card">
+        <div class="appearance-row">
+          <div><strong data-theme-label>白昼模式</strong><span>纸张与墨色</span></div>
+          <button class="theme-switch-button" type="button" data-theme-toggle aria-label="切换主题">☾</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>启动页风格</h3>
+      <div class="card">
+        <div class="card-content">
+          <p class="helper-text">系统冷启动页之后会衔接所选方案；Android 12 及以上同时会尝试让下一次系统冷启动页匹配该方案。所选方案会至少展示一秒。</p>
+          <div id="splash-style-options" class="splash-style-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="nav-container"></div>
+  <script type="module" src="js/vendor/capacitor-bridge.js"></script>
+  <script type="module" src="js/nav.js"></script>
+  <script type="module" src="js/page-entry.js"></script>
+</body>
+</html>

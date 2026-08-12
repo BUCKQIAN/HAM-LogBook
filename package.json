@@ -1,23 +1,27 @@
 {
   "name": "ham-logbook",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "业余无线电通联日志 Android App - HAM Radio QSO Logbook",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
     "sync": "npx cap sync",
     "android": "npx cap run android",
     "build": "npx cap copy && npx cap sync",
     "open": "npx cap open android"
   },
   "dependencies": {
-    "@capacitor/android": "^5.7.0",
-    "@capacitor/core": "^5.7.0",
-    "@capacitor/geolocation": "^5.0.0",
-    "@capacitor/filesystem": "^5.0.0",
-    "@capacitor/share": "^5.0.0",
-    "@capacitor-community/sqlite": "^5.0.0"
+    "@capacitor/android": "8.5.0",
+    "@capacitor/core": "8.5.0",
+    "@capacitor/geolocation": "8.2.1",
+    "@capacitor/filesystem": "8.1.2",
+    "@capacitor/share": "8.0.1",
+    "@capacitor-community/sqlite": "8.1.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^5.7.0"
+    "@capacitor/cli": "8.5.0"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }

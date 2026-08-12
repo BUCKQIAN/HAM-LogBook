@@ -7,6 +7,7 @@
    ============================================================ */
 
 import { latLngToLocator, isValidLocator, normalizeLocator } from './locator.js';
+import { loadHamQthCredentials } from './secure-data.js';
 
 const HAMQTH_BASE = 'https://www.hamqth.com/xml.php';
 const SESSION_KEY = 'hamlog_hamqth_session';
@@ -23,7 +24,12 @@ async function fetchWithTimeout(url, timeoutMs = REQUEST_TIMEOUT) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, {
+      signal: controller.signal,
+      cache: 'no-store',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer'
+    });
     if (!response.ok) throw new Error(`HamQTH 服务返回 HTTP ${response.status}`);
     return response;
   } catch (err) {
@@ -51,24 +57,85 @@ function parseXml(xmlText) {
 }
 
 /**
+ * 从 XML 节点中读取第一个非空标签值。
+ * HamQTH XML 使用默认命名空间；getElementsByTagNameNS 作为兼容兜底。
+ * @param {Document|Element} root
+ * @param {...string} tagNames
+ * @returns {string}
+ */
+function getFirstTagText(root, ...tagNames) {
+  for (const tagName of tagNames) {
+    const directNodes = root?.getElementsByTagName?.(tagName);
+    const directText = directNodes?.[0]?.textContent?.trim();
+    if (directText) return directText;
+
+    const namespacedNodes = root?.getElementsByTagNameNS?.('*', tagName);
+    const namespacedText = namespacedNodes?.[0]?.textContent?.trim();
+    if (namespacedText) return namespacedText;
+  }
+  return '';
+}
+
+/**
+ * 构建 HamQTH 官方 XML API 登录地址。
+ * 官方参数名为 u / p，而不是 username / password。
+ * @param {string} username
+ * @param {string} password
+ * @returns {string}
+ */
+export function buildHamQthLoginUrl(username, password) {
+  return `${HAMQTH_BASE}?u=${encodeURIComponent(username)}&p=${encodeURIComponent(password)}&prg=hamlogbook`;
+}
+
+/**
+ * 从登录响应中提取 Session ID。
+ * 当前官方字段是 session_id，保留 id 仅用于兼容旧响应。
+ * @param {Document} doc
+ * @returns {string}
+ */
+export function readHamQthSessionId(doc) {
+  return getFirstTagText(doc, 'session_id', 'id');
+}
+
+/**
+ * 将 HamQTH 原始错误转换为应用可处理的错误。
+ * @param {string} errorText
+ * @returns {{error: string, sessionExpired: boolean, clearSession: boolean}}
+ */
+export function classifyHamQthError(errorText) {
+  const message = String(errorText || '').trim();
+  if (/login failed|wrong|username or password missing/i.test(message)) {
+    return {
+      error: 'HamQTH 登录失败，请检查用户名和密码',
+      sessionExpired: false,
+      clearSession: true
+    };
+  }
+  if (/session does not exist/i.test(message)) {
+    return { error: message, sessionExpired: true, clearSession: true };
+  }
+  return {
+    error: `HamQTH 错误: ${message || '未知错误'}`,
+    sessionExpired: false,
+    clearSession: false
+  };
+}
+
+/**
  * 检查并获取 XML 中的错误信息
  * @param {Document} doc
  * @returns {{error: string, sessionExpired: boolean}|null}
  */
 function getXmlError(doc) {
-  const errorNode = doc.querySelector('session error');
-  if (!errorNode) return null;
+  const errorText = getFirstTagText(doc, 'error');
+  if (!errorText) return null;
 
-  const errorText = errorNode.textContent || '';
-  if (errorText.includes('Login failed') || errorText.includes('Wrong')) {
-    clearSessionCache();
-    return { error: 'HamQTH 登录失败，请检查用户名和密码', sessionExpired: false };
-  }
-  if (errorText.includes('Session does not exist')) {
-    clearSessionCache();
-    return { error: errorText, sessionExpired: true };
-  }
-  return { error: `HamQTH 错误: ${errorText}`, sessionExpired: false };
+  const errorInfo = classifyHamQthError(errorText);
+  if (errorInfo.clearSession) clearSessionCache();
+  return {
+    error: errorInfo.error,
+    sessionExpired: errorInfo.sessionExpired
+  };
 }
 
 /**
@@ -76,7 +143,7 @@ function getXmlError(doc) {
  * @returns {string|null}
  */
 function getCachedSessionId() {
-  const cached = localStorage.getItem(SESSION_KEY);
+  const cached = sessionStorage.getItem(SESSION_KEY);
   if (!cached) return null;
 
   try {
@@ -86,12 +153,12 @@ function getCachedSessionId() {
     }
   } catch (e) {
     // 缓存数据损坏，清除
-    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
     return null;
   }
 
   // 过期
-  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
   return null;
 }
 
@@ -100,7 +167,7 @@ function getCachedSessionId() {
  * @param {string} id
  */
 function cacheSessionId(id) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
     id: id,
     time: Date.now()
   }));
@@ -110,7 +177,7 @@ function cacheSessionId(id) {
  * 清除 Session 缓存
  */
 export function clearSessionCache() {
-  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
 }
 
 /**
@@ -118,14 +185,13 @@ export function clearSessionCache() {
  * @returns {Promise<string>}
  */
 async function hamqthLogin() {
-  const username = localStorage.getItem('hamlog_hamqth_user') || '';
-  const password = localStorage.getItem('hamlog_hamqth_pass') || '';
+  const { username, password } = await loadHamQthCredentials();
 
   if (!username || !password) {
     throw new Error('请先在设置页配置 HamQTH 账号');
   }
 
-  const url = `${HAMQTH_BASE}?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&prg=hamlogbook`;
+  const url = buildHamQthLoginUrl(username, password);
   const response = await fetchWithTimeout(url);
   const xmlText = await response.text();
   const doc = parseXml(xmlText);
@@ -137,12 +203,10 @@ async function hamqthLogin() {
   }
 
   // 提取 session id
-  const sessionIdNode = doc.querySelector('session id');
-  if (!sessionIdNode || !sessionIdNode.textContent) {
+  const sessionId = readHamQthSessionId(doc);
+  if (!sessionId) {
     throw new Error('HamQTH 登录失败：未获取到 Session');
   }
-
-  const sessionId = sessionIdNode.textContent.trim();
   cacheSessionId(sessionId);
   return sessionId;
 }

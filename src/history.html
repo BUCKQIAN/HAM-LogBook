@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
   <title>HAM Logbook - 历史记录</title>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/theme.js"></script>
@@ -28,7 +29,7 @@
           <div class="field-row">
             <div class="field field-wide">
               <label for="search-callsign">呼号</label>
-              <input class="uppercase-input" type="text" id="search-callsign" placeholder="例如 BH4ABC" autocomplete="off" autocapitalize="characters">
+              <input class="uppercase-input" type="text" id="search-callsign" placeholder="按呼号前缀，例如 BH4" autocomplete="off" autocapitalize="characters">
             </div>
             <div class="field">
               <label for="search-date-from">开始日期</label>
@@ -44,9 +45,6 @@
               <label for="search-band">频段</label>
               <select id="search-band">
                 <option value="">全部</option>
-                <option value="2m">2m</option>
-                <option value="70cm">70cm</option>
-                <option value="6m">6m</option>
               </select>
             </div>
             <div class="field">
@@ -81,6 +79,9 @@
         <div class="empty-text">暂无 QSO 记录</div>
       </div>
     </div>
+    <div class="history-load-more">
+      <button class="btn btn-secondary" type="button" id="load-more-btn" hidden>加载更多</button>
+    </div>
 
     <!-- 统计栏 -->
     <div class="stats-bar">
@@ -97,10 +98,7 @@
   <!-- Capacitor 原生插件桥接 -->
   <script type="module" src="js/vendor/capacitor-bridge.js"></script>
   <script type="module" src="js/nav.js"></script>
-  <script type="module">
-    import { initPage } from './js/history.js';
-    document.addEventListener('DOMContentLoaded', initPage);
-  </script>
+  <script type="module" src="js/page-entry.js"></script>
 
 </body>
 </html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>HAM Logbook - 数据管理</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/theme.js"></script>
+</head>
+<body data-settings-page="data">
+
+  <div class="top-bar">
+    <div class="top-bar-copy"><span class="top-brand">HAM LOGBOOK</span><h1>呼号查询与数据管理</h1></div>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换主题">☾</button>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div class="content">
+    <a class="settings-back-link" href="settings.html">‹ 返回设置</a>
+
+    <div class="settings-section">
+      <h3>呼号查询源（HamQTH）</h3>
+      <div class="card">
+        <div class="card-content">
+          <p class="helper-text">可选配置。未填写账号时仍可正常离线保存 QSO，仅停用联网呼号查询。</p>
+          <div class="field">
+            <label for="hamqth-user">用户名</label>
+            <input type="text" id="hamqth-user" placeholder="HamQTH 用户名" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="hamqth-pass">密码</label>
+            <input type="password" id="hamqth-pass" placeholder="HamQTH 密码" autocomplete="off">
+          </div>
+          <button class="btn-small btn-apply" id="save-account-btn">💾 保存账号</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>数据管理</h3>
+      <div class="card">
+        <div class="card-content">
+          <p class="helper-text">本地数据库使用 SQLCipher 加密并位于应用私有空间；ADIF 导出目录由你选择，应用会保存该文件夹的写入授权。</p>
+          <p class="helper-text">长期使用建议：在升级、卸载、清除应用数据或更换设备前先导出 ADIF。为避免账号密码随系统备份泄露，本应用已关闭 Android 自动备份；设备损坏或清除应用数据会删除本机日志，请以外部 ADIF 和个人信息文件作为恢复副本。</p>
+          <div class="field">
+            <label>ADIF 导出文件夹</label>
+            <div class="folder-picker-row">
+              <div class="folder-path-display" id="export-folder-name">正在读取文件夹设置…</div>
+              <button class="btn-small" type="button" id="choose-export-folder-btn">选择文件夹</button>
+            </div>
+            <p class="helper-text">首次导出时也会自动提示选择；之后可随时更换。</p>
+          </div>
+          <label class="setting-switch" for="auto-backup-enabled">
+            <span class="setting-switch__copy">
+              <strong>每天自动生成 ADIF 备份</strong>
+              <small>保存到上方文件夹，滚动保留最近 7 份</small>
+            </span>
+            <span class="setting-switch__control">
+              <input type="checkbox" id="auto-backup-enabled" role="switch">
+              <span class="setting-switch__track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <p class="helper-text">ADIF 是未加密交换格式且可包含台站坐标，请选择可信的私人目录。</p>
+          <button class="btn btn-primary" id="export-adif-btn">📤 导出 ADIF</button>
+          <label class="checkbox-label" for="include-adif-coordinates">
+            <input type="checkbox" id="include-adif-coordinates">
+            导出或分享时包含我的精确经纬度
+          </label>
+          <p class="helper-text">默认关闭；网格坐标仍会保留。仅在确认接收方和保存位置可信时开启。</p>
+          <div class="field">
+            <label for="adif-file">📥 导入 ADIF（选择 .adi 文件）</label>
+            <input type="file" id="adif-file" accept=".adi,.adif,.txt">
+          </div>
+          <button class="btn btn-secondary" id="share-adif-btn">📲 分享日志</button>
+          <div class="data-subsection">
+            <p class="helper-text"><strong>个人信息迁移</strong><br>备份中继台、台站呼号、操作证类别、默认 QTH、HamQTH 用户名和设备预设，不包含 QSO 日志。为防止凭据泄露，密码不会写入备份，迁移后需要重新填写。</p>
+            <label class="checkbox-label" for="encrypt-personal-info">
+              <input type="checkbox" id="encrypt-personal-info" checked>
+              使用备份密码加密个人信息文件（推荐）
+            </label>
+            <button class="btn btn-secondary" id="export-personal-info-btn">💾 保存个人信息</button>
+            <div class="field">
+              <label for="personal-info-file">♻️ 恢复个人信息（选择备份 JSON）</label>
+              <input type="file" id="personal-info-file" accept=".json,application/json">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="nav-container"></div>
+  <script type="module" src="js/vendor/capacitor-bridge.js"></script>
+  <script type="module" src="js/nav.js"></script>
+  <script type="module" src="js/page-entry.js"></script>
+</body>
+</html>

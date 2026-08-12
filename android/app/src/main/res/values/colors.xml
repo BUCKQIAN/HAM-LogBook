@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="native_splash_background">#F3EFE8</color>
+    <color name="native_splash_background_b">#FFFDF9</color>
+    <color name="native_splash_background_c">#F7F5F0</color>
+    <color name="native_splash_background_d">#24211F</color>
+    <color name="native_splash_background_e">#DED1BF</color>
 </resources>

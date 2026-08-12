@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 名称必须长期保持稳定：Android 12+ 会持久记录用户选择的主题资源名。 -->
+    <style name="NativeLaunchThemeA" parent="NativeLaunchThemeBase">
+        <item name="windowSplashScreenBackground">@color/native_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/native_splash_icon</item>
+        <item name="android:windowBackground">@color/native_splash_background</item>
+        <item name="android:statusBarColor">@color/native_splash_background</item>
+        <item name="android:navigationBarColor">@color/native_splash_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="NativeLaunchThemeB" parent="NativeLaunchThemeBase">
+        <item name="windowSplashScreenBackground">@color/native_splash_background_b</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/native_splash_icon_b</item>
+        <item name="android:windowBackground">@color/native_splash_background_b</item>
+        <item name="android:statusBarColor">@color/native_splash_background_b</item>
+        <item name="android:navigationBarColor">@color/native_splash_background_b</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="NativeLaunchThemeC" parent="NativeLaunchThemeBase">
+        <item name="windowSplashScreenBackground">@color/native_splash_background_c</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/native_splash_icon_c</item>
+        <item name="android:windowBackground">@color/native_splash_background_c</item>
+        <item name="android:statusBarColor">@color/native_splash_background_c</item>
+        <item name="android:navigationBarColor">@color/native_splash_background_c</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="NativeLaunchThemeD" parent="NativeLaunchThemeBase">
+        <item name="windowSplashScreenBackground">@color/native_splash_background_d</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/native_splash_icon_d</item>
+        <item name="android:windowBackground">@color/native_splash_background_d</item>
+        <item name="android:statusBarColor">@color/native_splash_background_d</item>
+        <item name="android:navigationBarColor">@color/native_splash_background_d</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="NativeLaunchThemeE" parent="NativeLaunchThemeBase">
+        <item name="windowSplashScreenBackground">@color/native_splash_background_e</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/native_splash_icon_e</item>
+        <item name="android:windowBackground">@color/native_splash_background_e</item>
+        <item name="android:statusBarColor">@color/native_splash_background_e</item>
+        <item name="android:navigationBarColor">@color/native_splash_background_e</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

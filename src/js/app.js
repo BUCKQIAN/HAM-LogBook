@@ -5,16 +5,53 @@
    - 中继台预设频率读取
    ============================================================ */
 
-import { initDatabase, saveQso, updateQso, getQsoById, deleteQso, checkDuplicate } from './db.js';
+import {
+  initDatabase,
+  saveQso,
+  updateQso,
+  getQsoById,
+  deleteQso,
+  checkDuplicate,
+  getCounterpartHistory
+} from './db.js';
 import { getCurrentPosition } from './gps.js';
 import { latLngToLocator, isValidLocator, normalizeLocator } from './locator.js';
 import { queryCallsign } from './hamqth.js';
-import { detectBandFromFrequency } from './radio.js';
+import { BAND_CATALOG, detectBandFromFrequency } from './radio.js';
+import {
+  getAllowedBandIds,
+  getStoredCnOperatorClass,
+  isBandAllowedForNewQso
+} from './operator-license.js';
+import { buildCounterpartProfiles, getCounterpartProfileValues } from './counterpart-profiles.js';
 import { getSplashStyle, hideNativeSplash, syncNativeSplashStyle } from './splash.js';
+import { hasMeaningfulDraftChanges, hasMeaningfulLegacyDraft } from './qso-draft.js';
+import { clearSecureDraft, loadSecureDraft, saveSecureDraft } from './secure-data.js';
+import { maybeCreateAutomaticBackup } from './automatic-backup.js';
 
 // ========== 页面状态 ==========
 let isEditMode = false;
 let editQsoId = null;
+const QSO_DRAFT_VERSION = 2;
+const QSO_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const QSO_DRAFT_FIELDS = [
+  // 日期和时间始终在进入记录页时取当前 UTC，不写入、恢复或触发草稿。
+  'callsign', 'mode', 'band', 'frequency',
+  'rst-sent', 'rst-rcvd', 'their-rig', 'their-antenna', 'their-power',
+  'op-qth', 'op-name', 'op-locator', 'my-rig', 'my-power', 'qsl-considered',
+  'my-lat', 'my-lon', 'my-alt', 'my-locator', 'notes'
+];
+let draftIsDirty = false;
+let editIsDirty = false;
+let draftSaveTimer = null;
+let draftWritePromise = Promise.resolve();
+let draftBaselineFields = {};
+let currentOperatorClass = 'A';
+let counterpartProfiles = [];
+let counterpartRequestId = 0;
+let lastRestrictedBandWarning = '';
+let pendingDraftNavigationHref = '';
+let draftDialogLastFocusedElement = null;
 
 // ========== 页面初始化 ==========
 
@@ -22,6 +59,8 @@ let editQsoId = null;
  * 初始化页面（DOMContentLoaded 时调用）
  */
 export async function initPage() {
+  const requestedEditId = new URLSearchParams(window.location.search).get('edit');
+
   // 先绑定所有事件（不依赖数据库，确保始终可用）
   bindEvents();
   setupLocatorAutoCalc();
@@ -29,13 +68,20 @@ export async function initPage() {
   window.addEventListener('online', updateLookupButtonState);
   window.addEventListener('offline', updateLookupButtonState);
 
+  // 必须在恢复草稿或旧记录前生成选项，避免 select 因找不到值而清空频段。
+  renderAllowedBandOptions();
+
   // 设置默认日期时间（纯 JS，不依赖数据库）
   setDefaultDateTime();
+  resetQsoDraftBaseline();
 
   // 加载设备预设列表（从 localStorage）
   loadRigPresets();
 
-  // 中继台预设同样只依赖 localStorage，不应受数据库状态影响。
+  // 新建记录在意外切页、进入后台或重启后都可恢复；编辑既有 QSO 时不使用草稿。
+  if (!requestedEditId) await restoreQsoDraft();
+
+  // 从中继页主动选择的预设应覆盖旧草稿中的频率。
   checkRepeaterPreset();
 
   // 迁移旧版本保存在 localStorage 的选择，并在网页首帧后关闭真正的原生启动页。
@@ -48,11 +94,9 @@ export async function initPage() {
   try {
     await initDatabase();
     // 以下依赖数据库的操作
-    const urlParams = new URLSearchParams(window.location.search);
-    const editId = urlParams.get('edit');
-    if (editId) {
+    if (requestedEditId) {
       try {
-        await loadQsoForEdit(parseInt(editId, 10));
+        await loadQsoForEdit(parseInt(requestedEditId, 10));
       } catch (error) {
         window.showToast('加载编辑记录: ' + (error.message || '失败'));
       }
@@ -123,6 +167,41 @@ function loadRigPresets() {
   } catch (e) { /* ignore */ }
 }
 
+// ========== 操作证类别与频段选项 ==========
+
+function renderAllowedBandOptions() {
+  currentOperatorClass = getStoredCnOperatorClass();
+  const bandSelect = document.getElementById('band');
+  if (!bandSelect) return;
+
+  const allowed = new Set(getAllowedBandIds(currentOperatorClass));
+  bandSelect.replaceChildren();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '选择频段';
+  bandSelect.appendChild(placeholder);
+
+  for (const band of BAND_CATALOG) {
+    if (!allowed.has(band.id)) continue;
+    const option = document.createElement('option');
+    option.value = band.id;
+    option.textContent = band.label;
+    bandSelect.appendChild(option);
+  }
+}
+
+/** 保留旧记录/旧草稿中的频段，但不把它加入当前类别的新建可选目录。 */
+function ensureStoredBandOption(value, sourceLabel) {
+  const band = String(value || '').trim().toLowerCase();
+  const bandSelect = document.getElementById('band');
+  if (!band || !bandSelect || Array.from(bandSelect.options).some(option => option.value === band)) return;
+  const option = document.createElement('option');
+  option.value = band;
+  option.textContent = `${band}（${sourceLabel}）`;
+  option.dataset.storedBand = 'true';
+  bandSelect.appendChild(option);
+}
+
 // ========== 手动获取 UTC 时间 ==========
 
 function handleRefreshUTCTime() {
@@ -150,6 +229,7 @@ function checkRepeaterPreset() {
     if (preset.frequency != null) {
       document.getElementById('frequency').value = preset.frequency;
       applyDetectedBand();
+      markQsoDraftDirty();
     }
   } catch (e) {
     // ignore
@@ -179,9 +259,18 @@ function populateForm(qso) {
   document.getElementById('time-on').value = window.dbTimeToDisplay(qso.time_on);
   document.getElementById('time-off').value = window.dbTimeToDisplay(qso.time_off);
   document.getElementById('callsign').value = qso.callsign || '';
-  document.getElementById('mode').value = qso.mode || 'FM';
+  const modeSelect = document.getElementById('mode');
+  const mode = qso.mode || 'FM';
+  if (mode && !Array.from(modeSelect.options).some(option => option.value === mode)) {
+    const option = document.createElement('option');
+    option.value = mode;
+    option.textContent = mode;
+    modeSelect.appendChild(option);
+  }
+  modeSelect.value = mode;
   updateRSTPlaceholders();
-  document.getElementById('band').value = qso.band || '';
+  ensureStoredBandOption(qso.band, '历史记录值');
+  document.getElementById('band').value = String(qso.band || '').toLowerCase();
   document.getElementById('frequency').value = qso.frequency ?? '';
   document.getElementById('rst-sent').value = qso.rst_sent || '';
   document.getElementById('rst-rcvd').value = qso.rst_rcvd || '';
@@ -197,6 +286,7 @@ function populateForm(qso) {
   document.getElementById('their-antenna').value = qso.their_antenna || '';
   document.getElementById('my-power').value = qso.my_power ?? '';
   document.getElementById('my-rig').value = qso.my_rig || '';
+  document.getElementById('qsl-considered').value = Number(qso.qsl_considered) === 1 ? '1' : '0';
   document.getElementById('notes').value = qso.notes || '';
 
   // 旧记录没有保存网格时，根据经纬度补算。
@@ -206,6 +296,7 @@ function populateForm(qso) {
 function setEditMode(enabled, qsoId = null) {
   isEditMode = enabled;
   editQsoId = qsoId;
+  editIsDirty = false;
 
   const saveBtn = document.getElementById('save-btn');
   const deleteBtn = document.getElementById('delete-btn');
@@ -216,6 +307,7 @@ function setEditMode(enabled, qsoId = null) {
     deleteBtn.style.display = 'flex';
     clearBtn.textContent = '取消编辑';
     document.documentElement.dataset.editId = qsoId;
+    hideCounterpartProfiles();
   } else {
     saveBtn.innerHTML = '💾 保存 QSO';
     deleteBtn.style.display = 'none';
@@ -223,6 +315,7 @@ function setEditMode(enabled, qsoId = null) {
     delete document.documentElement.dataset.editId;
     window.history.replaceState({}, '', window.location.pathname);
   }
+  updateCounterpartHistoryButtonState();
 }
 
 // ========== 事件绑定 ==========
@@ -234,6 +327,12 @@ function bindEvents() {
   document.getElementById('gps-btn').addEventListener('click', handleGetLocation);
   document.getElementById('default-loc-btn').addEventListener('click', handleUseDefaultLocation);
   document.getElementById('lookup-btn').addEventListener('click', handleCallsignLookup);
+  document.getElementById('counterpart-history-btn')?.addEventListener('click', handleCounterpartHistoryLookup);
+  document.getElementById('counterpart-profile-close')?.addEventListener('click', hideCounterpartProfiles);
+  document.getElementById('callsign')?.addEventListener('input', () => {
+    counterpartRequestId++;
+    hideCounterpartProfiles();
+  });
   document.getElementById('utc-time-btn').addEventListener('click', handleRefreshUTCTime);
 
   // 频率录入完成后自动识别常用业余频段，仍允许用户手动调整。
@@ -242,7 +341,202 @@ function bindEvents() {
   frequencyInput.addEventListener('blur', applyDetectedBand);
 
   document.getElementById('mode').addEventListener('change', updateRSTPlaceholders);
+  bindQsoDraftProtection();
   updateRSTPlaceholders();
+  updateCounterpartHistoryButtonState();
+}
+
+// ========== 新建 QSO 草稿保护 ==========
+
+function bindQsoDraftProtection() {
+  QSO_DRAFT_FIELDS.forEach(id => {
+    const input = document.getElementById(id);
+    input?.addEventListener('input', markQsoDraftDirty);
+    input?.addEventListener('change', markQsoDraftDirty);
+  });
+
+  // 移动端的 beforeunload 不可靠，因此以可恢复草稿为主，并在主动导航前再次落盘。
+  document.querySelectorAll('.bottom-nav a').forEach(link => {
+    link.addEventListener('click', event => {
+      if (link.pathname === window.location.pathname) {
+        event.preventDefault();
+        return;
+      }
+      if (isEditMode) {
+        if (editIsDirty && !confirm('当前编辑尚未保存，确定离开此页面吗？')) event.preventDefault();
+        return;
+      }
+      if (!draftIsDirty || !hasMeaningfulCurrentDraft()) {
+        if (draftIsDirty) void clearQsoDraft();
+        return;
+      }
+      event.preventDefault();
+      showDraftLeaveDialog(link.href);
+    });
+  });
+  bindDraftLeaveDialog();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void persistQsoDraft();
+  });
+  window.addEventListener('pagehide', () => void persistQsoDraft());
+}
+
+function bindDraftLeaveDialog() {
+  const dialog = document.getElementById('draft-leave-dialog');
+  if (!dialog) return;
+  document.getElementById('draft-leave-delete')?.addEventListener('click', async () => {
+    const href = pendingDraftNavigationHref;
+    await clearQsoDraft();
+    closeDraftLeaveDialog(false);
+    if (href) window.location.href = href;
+  });
+  document.getElementById('draft-leave-temporary')?.addEventListener('click', async () => {
+    if (!await persistQsoDraft()) {
+      window.showToast('草稿保存失败，无法暂时离开；请先保存 QSO', 4000);
+      return;
+    }
+    const href = pendingDraftNavigationHref;
+    closeDraftLeaveDialog(false);
+    if (href) window.location.href = href;
+  });
+  document.getElementById('draft-leave-continue')?.addEventListener('click', () => {
+    closeDraftLeaveDialog();
+  });
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog) closeDraftLeaveDialog();
+  });
+  dialog.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeDraftLeaveDialog();
+    }
+  });
+}
+
+function showDraftLeaveDialog(href) {
+  const dialog = document.getElementById('draft-leave-dialog');
+  if (!dialog) return;
+  pendingDraftNavigationHref = href;
+  draftDialogLastFocusedElement = document.activeElement;
+  dialog.hidden = false;
+  document.body.classList.add('modal-open');
+  window.requestAnimationFrame(() => document.getElementById('draft-leave-continue')?.focus());
+}
+
+function closeDraftLeaveDialog(restoreFocus = true) {
+  const dialog = document.getElementById('draft-leave-dialog');
+  if (dialog) dialog.hidden = true;
+  document.body.classList.remove('modal-open');
+  pendingDraftNavigationHref = '';
+  if (restoreFocus && draftDialogLastFocusedElement?.focus) draftDialogLastFocusedElement.focus();
+  draftDialogLastFocusedElement = null;
+}
+
+function markQsoDraftDirty() {
+  if (isEditMode) {
+    editIsDirty = true;
+    return;
+  }
+  draftIsDirty = true;
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(() => void persistQsoDraft(), 150);
+}
+
+function captureQsoDraftFields() {
+  const fields = {};
+  QSO_DRAFT_FIELDS.forEach(id => {
+    const input = document.getElementById(id);
+    if (input) fields[id] = input.value;
+  });
+  return fields;
+}
+
+function resetQsoDraftBaseline() {
+  draftBaselineFields = captureQsoDraftFields();
+}
+
+function hasMeaningfulCurrentDraft() {
+  return hasMeaningfulDraftChanges(captureQsoDraftFields(), draftBaselineFields);
+}
+
+function queueDraftWrite(operation) {
+  draftWritePromise = draftWritePromise.catch(() => undefined).then(operation);
+  return draftWritePromise;
+}
+
+async function persistQsoDraft() {
+  if (isEditMode || !draftIsDirty) return true;
+  const fields = captureQsoDraftFields();
+  if (!hasMeaningfulDraftChanges(fields, draftBaselineFields)) {
+    await clearQsoDraft();
+    return true;
+  }
+  try {
+    const data = JSON.stringify({
+      version: QSO_DRAFT_VERSION,
+      saved_at: Date.now(),
+      baseline: draftBaselineFields,
+      fields
+    });
+    await queueDraftWrite(() => saveSecureDraft(data));
+    return true;
+  } catch (error) {
+    console.warn('保存 QSO 草稿失败:', error);
+    return false;
+  }
+}
+
+async function restoreQsoDraft() {
+  try {
+    const raw = await loadSecureDraft();
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+    if (![1, QSO_DRAFT_VERSION].includes(draft?.version) || !draft.fields || typeof draft.fields !== 'object') {
+      throw new Error('invalid draft');
+    }
+    if (!Number.isFinite(Number(draft.saved_at)) || Date.now() - Number(draft.saved_at) > QSO_DRAFT_MAX_AGE_MS) {
+      await clearQsoDraft();
+      return;
+    }
+    const meaningful = hasMeaningfulLegacyDraft(draft.fields);
+    if (!meaningful) {
+      await clearQsoDraft();
+      return;
+    }
+    QSO_DRAFT_FIELDS.forEach(id => {
+      const input = document.getElementById(id);
+      if (input && typeof draft.fields[id] === 'string') {
+        if (id === 'band') {
+          const draftBand = draft.fields[id].trim().toLowerCase();
+          ensureStoredBandOption(draftBand, '草稿原值');
+          input.value = draftBand;
+        } else {
+          input.value = draft.fields[id];
+        }
+      }
+    });
+    updateRSTPlaceholders();
+    draftIsDirty = true;
+    window.showToast('已恢复未保存的 QSO 草稿');
+  } catch (error) {
+    console.warn('读取加密 QSO 草稿失败:', error);
+    try { await clearQsoDraft(); }
+    catch (storageError) { /* ignore */ }
+  }
+}
+
+async function clearQsoDraft() {
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = null;
+  draftIsDirty = false;
+  try { await queueDraftWrite(clearSecureDraft); }
+  catch (error) { console.warn('清除 QSO 草稿失败:', error); }
+}
+
+function queueAutomaticBackup() {
+  void maybeCreateAutomaticBackup().catch(error => {
+    window.showToast('QSO 已保存，但自动备份失败：' + (error.message || String(error)), 5000);
+  });
 }
 
 // ========== 保存 QSO ==========
@@ -287,6 +581,7 @@ async function handleSave() {
         await deleteQso(editQsoId);
       }
       window.showToast('QSO 已覆盖更新');
+      queueAutomaticBackup();
       clearForm();
       return;
     }
@@ -299,6 +594,8 @@ async function handleSave() {
       window.showToast('保存成功');
     }
 
+    queueAutomaticBackup();
+    clearQsoDraft();
     clearForm();
   } catch (error) {
     window.showToast('保存失败：' + error.message);
@@ -319,6 +616,8 @@ async function handleDelete() {
   try {
     await deleteQso(editQsoId);
     window.showToast('已删除');
+    queueAutomaticBackup();
+    clearQsoDraft();
     clearForm();
   } catch (error) {
     window.showToast('删除失败：' + error.message);
@@ -329,8 +628,10 @@ async function handleDelete() {
 
 function handleClear() {
   if (isEditMode) {
+    if (editIsDirty && !confirm('当前修改尚未保存，确定取消编辑吗？')) return;
     clearForm();
   } else {
+    if (draftIsDirty && hasMeaningfulCurrentDraft() && !confirm('确定清空当前 QSO 表单和自动草稿吗？')) return;
     // 新建模式下清空所有输入
     document.querySelectorAll('input:not([type="hidden"]), textarea').forEach(el => {
       el.value = '';
@@ -338,8 +639,12 @@ function handleClear() {
     document.querySelectorAll('select').forEach(el => {
       el.selectedIndex = 0;
     });
+    renderAllowedBandOptions();
+    hideCounterpartProfiles();
     updateRSTPlaceholders();
     setDefaultDateTime();
+    resetQsoDraftBaseline();
+    clearQsoDraft();
   }
 }
 
@@ -350,8 +655,12 @@ function clearForm() {
   document.querySelectorAll('select').forEach(el => {
     el.selectedIndex = 0;
   });
+  renderAllowedBandOptions();
+  hideCounterpartProfiles();
   updateRSTPlaceholders();
   setDefaultDateTime();
+  resetQsoDraftBaseline();
+  clearQsoDraft();
   setEditMode(false, null);
 }
 
@@ -373,6 +682,7 @@ async function handleGetLocation() {
 
     // 自动计算网格
     autoCalcMyLocator();
+    markQsoDraftDirty();
     if (position.alt !== null) window.showToast('位置和海拔获取成功');
   } catch (error) {
     window.showToast(error.message);
@@ -398,6 +708,7 @@ function handleUseDefaultLocation() {
     if (qth.lat != null && qth.lon != null) {
       autoCalcMyLocator();
     }
+    markQsoDraftDirty();
     window.showToast('已填充默认位置');
   } catch (e) {
     window.showToast('默认位置数据格式错误');
@@ -405,6 +716,132 @@ function handleUseDefaultLocation() {
 }
 
 // ========== 呼号查询 ==========
+
+function updateCounterpartHistoryButtonState() {
+  const button = document.getElementById('counterpart-history-btn');
+  if (!button) return;
+  button.hidden = isEditMode;
+  button.disabled = isEditMode;
+}
+
+function hideCounterpartProfiles() {
+  counterpartProfiles = [];
+  const panel = document.getElementById('counterpart-profile-panel');
+  const list = document.getElementById('counterpart-profile-list');
+  if (panel) panel.hidden = true;
+  if (list) list.replaceChildren();
+}
+
+async function handleCounterpartHistoryLookup() {
+  if (isEditMode) return;
+  const callsignInput = document.getElementById('callsign');
+  const callsign = String(callsignInput?.value || '').trim().toUpperCase();
+  if (!callsign) {
+    window.showToast('请先输入完整呼号');
+    callsignInput?.focus();
+    return;
+  }
+  callsignInput.value = callsign;
+
+  const button = document.getElementById('counterpart-history-btn');
+  if (!button || button.disabled) return;
+  const requestId = ++counterpartRequestId;
+  button.disabled = true;
+  button.textContent = '⏳';
+  hideCounterpartProfiles();
+
+  try {
+    if (!window._dbReady) await initDatabase();
+    const rows = await getCounterpartHistory(callsign, 50);
+    if (requestId !== counterpartRequestId || callsign !== callsignInput.value.trim().toUpperCase() || isEditMode) return;
+
+    counterpartProfiles = buildCounterpartProfiles(rows, 5);
+    if (!counterpartProfiles.length) {
+      window.showToast(`没有找到 ${callsign} 可复用的历史资料`);
+      return;
+    }
+    renderCounterpartProfiles(callsign);
+  } catch (error) {
+    if (requestId === counterpartRequestId) {
+      window.showToast('历史资料查询失败：' + (error.message || String(error)));
+    }
+  } finally {
+    button.textContent = '🕘';
+    button.disabled = isEditMode;
+  }
+}
+
+function renderCounterpartProfiles(callsign) {
+  const panel = document.getElementById('counterpart-profile-panel');
+  const title = document.getElementById('counterpart-profile-title');
+  const list = document.getElementById('counterpart-profile-list');
+  if (!panel || !title || !list) return;
+
+  title.textContent = `${callsign} 的历史资料（点击带入）`;
+  list.replaceChildren();
+  counterpartProfiles.forEach(profile => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'counterpart-profile-option';
+
+    const meta = document.createElement('span');
+    meta.className = 'counterpart-profile-option__meta';
+    const date = formatDbDateForProfile(profile.qso_date);
+    meta.textContent = `${date ? `最近使用 ${date}` : '历史资料'}${profile.recentUseCount > 1 ? ` · 近期重复 ${profile.recentUseCount} 次` : ''}`;
+
+    const summary = document.createElement('span');
+    summary.className = 'counterpart-profile-option__summary';
+    summary.textContent = summarizeCounterpartProfile(profile);
+
+    option.append(meta, summary);
+    option.addEventListener('click', () => applyCounterpartProfile(profile));
+    list.appendChild(option);
+  });
+  panel.hidden = false;
+}
+
+function formatDbDateForProfile(value) {
+  const date = String(value || '');
+  return /^\d{8}$/.test(date) ? `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}` : '';
+}
+
+function summarizeCounterpartProfile(profile) {
+  const parts = [];
+  if (profile.operator_name) parts.push(`姓名：${profile.operator_name}`);
+  if (profile.qth) parts.push(`QTH：${profile.qth}`);
+  if (profile.locator) parts.push(`网格：${profile.locator}`);
+  if (profile.their_rig) parts.push(`设备：${profile.their_rig}`);
+  if (profile.their_antenna) parts.push(`天线：${profile.their_antenna}`);
+  if (profile.their_power) parts.push(`功率：${profile.their_power}`);
+  return parts.join(' · ');
+}
+
+function applyCounterpartProfile(profile) {
+  if (isEditMode) return;
+  const fieldIds = {
+    operator_name: 'op-name',
+    qth: 'op-qth',
+    locator: 'op-locator',
+    their_rig: 'their-rig',
+    their_antenna: 'their-antenna',
+    their_power: 'their-power'
+  };
+  const values = getCounterpartProfileValues(profile);
+  const conflicts = Object.entries(values).filter(([field, value]) => {
+    const current = document.getElementById(fieldIds[field])?.value?.trim() || '';
+    const comparableCurrent = field === 'locator' ? normalizeLocator(current) : current;
+    return comparableCurrent && comparableCurrent !== value;
+  });
+  if (conflicts.length && !confirm('当前表单已有对方资料，确定用所选历史资料覆盖对应字段吗？')) return;
+
+  for (const [field, value] of Object.entries(values)) {
+    const input = document.getElementById(fieldIds[field]);
+    if (input) input.value = field === 'locator' ? normalizeLocator(value) : value;
+  }
+  markQsoDraftDirty();
+  hideCounterpartProfiles();
+  window.showToast('已带入历史对方资料');
+}
 
 async function handleCallsignLookup() {
   const callsignInput = document.getElementById('callsign');
@@ -428,6 +865,7 @@ async function handleCallsignLookup() {
     if (info.name) document.getElementById('op-name').value = info.name;
     if (info.qth) document.getElementById('op-qth').value = info.qth;
     if (info.grid) document.getElementById('op-locator').value = normalizeLocator(info.grid);
+    markQsoDraftDirty();
     window.showToast('查询成功');
   } catch (error) {
     window.showToast(error.message);
@@ -450,8 +888,18 @@ function applyDetectedBand() {
   const frequency = document.getElementById('frequency')?.value;
   const band = detectBandFromFrequency(frequency);
   const bandSelect = document.getElementById('band');
-  if (band && bandSelect && bandSelect.querySelector(`option[value="${band}"]`)) {
+  const hasOption = bandSelect && Array.from(bandSelect.options).some(option => option.value === band);
+  if (band && hasOption) {
     bandSelect.value = band;
+    lastRestrictedBandWarning = '';
+  } else if (band && !isEditMode && !isBandAllowedForNewQso(band, currentOperatorClass)) {
+    bandSelect.value = '';
+    if (lastRestrictedBandWarning !== band) {
+      lastRestrictedBandWarning = band;
+      window.showToast(`${band} 不在当前 ${currentOperatorClass} 类的新建频段选项中`);
+    }
+  } else if (!band) {
+    lastRestrictedBandWarning = '';
   }
 }
 
@@ -537,8 +985,18 @@ function validateForm() {
   // RST 格式验证（按模式）
   const mode = document.getElementById('mode').value;
   const band = document.getElementById('band').value;
+  if (!mode) {
+    window.showToast('请选择通联模式');
+    document.getElementById('mode').focus();
+    return false;
+  }
   if (!band) {
     window.showToast('请选择频段');
+    document.getElementById('band').focus();
+    return false;
+  }
+  if (!isEditMode && !isBandAllowedForNewQso(band, currentOperatorClass)) {
+    window.showToast(`${currentOperatorClass} 类不能用该频段新建 QSO，请重新选择`);
     document.getElementById('band').focus();
     return false;
   }
@@ -635,6 +1093,7 @@ function getFormData() {
     locator: normalizeLocator(document.getElementById('op-locator').value),
     rst_sent: document.getElementById('rst-sent').value.trim(),
     rst_rcvd: document.getElementById('rst-rcvd').value.trim(),
+    qsl_considered: document.getElementById('qsl-considered').value === '1' ? 1 : 0,
     mode: document.getElementById('mode').value,
     band: document.getElementById('band').value,
     frequency: Number(document.getElementById('frequency').value),

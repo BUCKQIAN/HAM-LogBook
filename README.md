@@ -17,7 +17,7 @@
 | 📤 **ADIF 导入/导出** | 标准 ADIF 3.1.4 格式，兼容 Logger32 / N1MM / Wavelog |
 | 💾 **SQLite 存储** | 所有数据存于应用私有空间，不上传任何服务器 |
 | ◐ **昼夜主题** | 纸张与墨色风格，支持白昼 / 黑夜模式切换 |
-| 🖼️ **原生启动页** | 五种 Android 原生启动风格，先于 WebView 与数据库显示 |
+| 🖼️ **原生启动页** | 五种 Android 原生启动风格；Android 12+ 冷启动直接使用所选系统主题，Android 11 及以下由中性首帧无闪烁过渡 |
 
 ## 🖥️ 环境要求
 
@@ -94,15 +94,21 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ### ADIF 导出
 
 - 设置 → 数据管理 → 导出 ADIF
-- 文件导出至应用可访问的文档目录，可直接分享给 Logger32 / N1MM / Wavelog
+- 首次导出时通过 Android 系统界面选择目标文件夹，应用会保存该文件夹的访问授权
+- 之后可在设置页随时更换导出文件夹；文件名包含导出时间，同名时会自动追加序号，不覆盖已有备份
+- “分享日志”会生成临时 ADIF 文件并打开系统分享面板，可发送给 Logger32 / N1MM / Wavelog
+- 大型日志会分批读取和写入，历史页也按游标分页，避免长期使用后一次性占用大量内存
+- 个人信息可单独备份和恢复；HamQTH 密码由 Android Keystore 加密保存且不会写入备份
+- QSO 数据库使用 SQLCipher 加密；升级旧版本时会自动迁移原有日志
 
 ## 🔒 权限说明
 
 | 权限 | 用途 | 申请时机 |
 |------|------|---------|
 | `ACCESS_FINE_LOCATION` / `COARSE` | 获取当前位置、海拔、网格坐标 | **首次启动时**统一申请 |
-| `READ/WRITE_EXTERNAL_STORAGE` | ADIF 文件导出/导入（Android 10- 场景） | **首次启动时**统一申请 |
 | `INTERNET` | HamQTH 呼号查询 | 静默授予 |
+
+ADIF 导入和导出使用 Android 系统文件选择器及文件夹持久授权，不申请整盘存储权限。
 
 ## 📁 项目结构
 

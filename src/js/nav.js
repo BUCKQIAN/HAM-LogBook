@@ -19,7 +19,7 @@ const currentPath = window.location.pathname.split('/').pop() || 'index.html';
 const navContainer = document.getElementById('nav-container');
 if (navContainer) {
   navContainer.innerHTML = '<nav class="bottom-nav">' + pages.map(p => {
-    const isActive = currentPath === p.href;
+    const isActive = currentPath === p.href || (p.id === 'settings' && currentPath.startsWith('settings-'));
     return `<a href="${p.href}" class="nav-item ${isActive ? 'nav-active' : ''}">
       <span class="nav-icon">${p.icon}</span>
       <span>${p.label}</span>
@@ -120,14 +120,17 @@ window.getNowUTC = function () {
 };
 
 /**
- * 获取 ADIF 导出用的日期字符串 YYYYMMDD
+ * 获取导出文件用的本地时间字符串 YYYYMMDD-HHMMSS，避免同日多次备份互相覆盖。
  */
 window.getExportDateString = function () {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
-  return `${y}${m}${d}`;
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  return `${y}${m}${d}-${hh}${mm}${ss}`;
 };
 
 // ========== 全局错误处理 ==========

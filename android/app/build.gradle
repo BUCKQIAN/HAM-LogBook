@@ -1,27 +1,85 @@
 apply plugin: 'com.android.application'
 
+def releaseSigningProperties = new Properties()
+def releaseSigningPropertiesFile = rootProject.file('keystore.properties')
+if (releaseSigningPropertiesFile.exists()) {
+    releaseSigningPropertiesFile.withInputStream { stream ->
+        releaseSigningProperties.load(stream)
+    }
+}
+
+def releaseStoreFilePath = System.getenv('HAMLOG_RELEASE_STORE_FILE')
+        ?: releaseSigningProperties.getProperty('storeFile')
+def releaseStorePassword = System.getenv('HAMLOG_RELEASE_STORE_PASSWORD')
+        ?: releaseSigningProperties.getProperty('storePassword')
+def releaseKeyAlias = System.getenv('HAMLOG_RELEASE_KEY_ALIAS')
+        ?: releaseSigningProperties.getProperty('keyAlias')
+def releaseKeyPassword = System.getenv('HAMLOG_RELEASE_KEY_PASSWORD')
+        ?: releaseSigningProperties.getProperty('keyPassword')
+def releaseSigningReady = [
+        releaseStoreFilePath,
+        releaseStorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword
+].every { value -> value != null && !value.trim().isEmpty() }
+
+def releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.toLowerCase().contains('release')
+}
+
 android {
-    namespace "xin.anji.hamlogbook"
-    compileSdkVersion rootProject.ext.compileSdkVersion
+    namespace = "xin.anji.hamlogbook"
+    compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "xin.anji.hamlogbook"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10
-        versionName "1.0.0"
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        applicationId = "xin.anji.hamlogbook"
+        minSdk = rootProject.ext.minSdkVersion
+        targetSdk = rootProject.ext.targetSdkVersion
+        versionCode = 11
+        versionName = "1.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (releaseSigningReady) {
+            release {
+                storeFile rootProject.file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
     buildTypes {
+        debug {
+            // 调试版与正式版并存，避免调试签名覆盖或冒充用户的正式安装包。
+            applicationIdSuffix = '.debug'
+            versionNameSuffix = '-debug'
+            resValue 'string', 'app_name', 'HAM Logbook Debug'
+        }
         release {
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+if (releaseTaskRequested && !releaseSigningReady) {
+    throw new GradleException(
+            'Release build blocked: copy android/keystore.properties.example to ' +
+            'android/keystore.properties and configure the original signing key, ' +
+            'or set all HAMLOG_RELEASE_* environment variables.'
+    )
+}
+
+if (releaseTaskRequested && !rootProject.file(releaseStoreFilePath).isFile()) {
+    throw new GradleException('Release build blocked: the configured signing key file does not exist.')
 }
 
 repositories {

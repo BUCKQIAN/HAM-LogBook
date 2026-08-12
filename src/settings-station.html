@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>HAM Logbook - 台站资料</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/theme.js"></script>
+</head>
+<body data-settings-page="station">
+
+  <div class="top-bar">
+    <div class="top-bar-copy"><span class="top-brand">HAM LOGBOOK</span><h1>台站资料与预设</h1></div>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换主题">☾</button>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div class="content">
+    <a class="settings-back-link" href="settings.html">‹ 返回设置</a>
+
+    <div class="settings-section">
+      <h3>台站资料</h3>
+      <div class="card">
+        <div class="card-content">
+          <div class="field">
+            <label for="station-callsign">我的台站呼号</label>
+            <input class="uppercase-input" type="text" id="station-callsign" placeholder="例如 BH4ABC/P" autocomplete="off" autocapitalize="characters">
+            <p class="helper-text">保存后写入新记录的 STATION_CALLSIGN 字段，使 ADIF 文件更完整。</p>
+          </div>
+          <div class="field">
+            <label for="operator-class">中国大陆业余无线电台操作技术能力类别</label>
+            <select id="operator-class">
+              <option value="A">A 类（新建 QSO：6m、2m、70cm）</option>
+              <option value="B">B 类（应用支持的全部常用频段）</option>
+              <option value="C">C 类（应用支持的全部常用频段）</option>
+            </select>
+            <p class="helper-text">本设置只限制应用中新建 QSO 的频段选项，不替代电台执照载明的频率、功率及当地管理要求。</p>
+          </div>
+          <button class="btn-small btn-apply" id="save-station-btn">保存台站资料</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>我的设备预设</h3>
+      <div class="card">
+        <div class="card-content">
+          <div class="field">
+            <label for="my-rigs-input">设备列表（每行一个，通联时可快速选择）</label>
+            <textarea id="my-rigs-input" rows="4"></textarea>
+          </div>
+          <button class="btn-small btn-apply" id="save-rigs-btn">💾 保存设备列表</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>默认 QTH（我的位置）</h3>
+      <div class="card">
+        <div class="card-content">
+          <div class="field-row">
+            <div class="field">
+              <label for="default-lat">纬度</label>
+              <input type="text" id="default-lat" placeholder="例 31.2304" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="default-lon">经度</label>
+              <input type="text" id="default-lon" placeholder="例 121.4737" autocomplete="off">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="default-alt">海拔 (m)</label>
+              <input type="text" id="default-alt" inputmode="decimal" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="default-locator">网格坐标</label>
+              <input class="uppercase-input" type="text" id="default-locator" placeholder="自动计算" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            </div>
+          </div>
+          <button class="btn-small btn-apply" id="save-qth-btn">💾 保存默认位置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="nav-container"></div>
+  <script type="module" src="js/vendor/capacitor-bridge.js"></script>
+  <script type="module" src="js/nav.js"></script>
+  <script type="module" src="js/page-entry.js"></script>
+</body>
+</html>

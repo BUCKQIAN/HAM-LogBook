@@ -434,58 +434,45 @@ export class CapacitorSQLiteWeb extends WebPlugin {
         throw this.unimplemented('Not implemented on web.');
     }
     async getMigratableDbList(options) {
-        console.log('getMigratableDbList', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async addSQLiteSuffix(options) {
-        console.log('addSQLiteSuffix', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async deleteOldDatabases(options) {
-        console.log('deleteOldDatabases', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async moveDatabasesAndAddSuffix(options) {
-        console.log('moveDatabasesAndAddSuffix', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async isSecretStored() {
         throw this.unimplemented('Not implemented on web.');
     }
     async setEncryptionSecret(options) {
-        console.log('setEncryptionSecret', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async changeEncryptionSecret(options) {
-        console.log('changeEncryptionSecret', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async clearEncryptionSecret() {
-        console.log('clearEncryptionSecret');
         throw this.unimplemented('Not implemented on web.');
     }
     async checkEncryptionSecret(options) {
-        console.log('checkEncryptionPassPhrase', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async getNCDatabasePath(options) {
-        console.log('getNCDatabasePath', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async createNCConnection(options) {
-        console.log('createNCConnection', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async closeNCConnection(options) {
-        console.log('closeNCConnection', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async isNCDatabase(options) {
-        console.log('isNCDatabase', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async isDatabaseEncrypted(options) {
-        console.log('isDatabaseEncrypted', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async isInConfigEncryption() {
@@ -495,11 +482,9 @@ export class CapacitorSQLiteWeb extends WebPlugin {
         throw this.unimplemented('Not implemented on web.');
     }
     async loadExtension(options) {
-        console.log('loadExtension', options);
         throw this.unimplemented('Not implemented on web.');
     }
     async enableLoadExtension(options) {
-        console.log('enableLoadExtension', options);
         throw this.unimplemented('Not implemented on web.');
     }
 }

@@ -71,55 +71,187 @@ const DB_TO_ADIF_MAP = {
  * @param {string} text - ADIF 文件原始文本
  * @returns {Array<Object>} 解析后的 QSO 记录数组
  */
-export function parseADIF(text) {
-  const records = [];
+export function parseADIF(text, options = {}) {
+  const source = String(text || '');
+  const headerEnd = findControlTagEnd(source, 'eoh');
+  const header = headerEnd >= 0 ? source.slice(0, headerEnd) : source;
+  const isLegacyHamLogbookExport = options.isLegacyHamLogbookExport
+    ?? /<PROGRAMID:\d+(?::[^>]*)?>hamlogbook/i.test(header);
+  const dataSection = headerEnd >= 0 ? source.slice(headerEnd) : source;
+  const drained = drainAdifRecordBuffer(dataSection, isLegacyHamLogbookExport);
+  const records = drained.values;
 
-  // 查找 EOH 位置，跳过文件头
-  const eohMatch = text.match(/<eoh>/i);
-  const dataStart = eohMatch ? eohMatch.index + 5 : 0;
-  const dataSection = text.slice(dataStart);
+  // 容忍少数第三方软件导出的最后一条缺少 EOR，但只接受字段本身完整的记录。
+  if (drained.remainder.trim()) {
+    const trailing = parseAdifRecord(drained.remainder, isLegacyHamLogbookExport);
+    if (trailing.complete && trailing.record?.callsign) records.push(trailing.record);
+  }
+  return records;
+}
 
-  // 按 <EOR> 分割记录（大小写不敏感）
-  const chunks = dataSection.split(/<eor>/i);
+/**
+ * 分块读取大型 ADIF 文件并逐条产出记录，避免 FileReader + parseADIF
+ * 同时在内存中保留完整文件和完整对象数组。
+ */
+export async function* parseADIFFile(file, chunkSize = 512 * 1024) {
+  if (!file || typeof file.slice !== 'function') throw new Error('ADIF 文件无效');
 
-  for (const chunk of chunks) {
-    const record = {};
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let offset = 0;
+  let headerResolved = false;
+  let isLegacyHamLogbookExport = false;
 
-    // 正则匹配 <FIELD:LENGTH> 或 <FIELD:LENGTH:TYPE>
-    const fieldPattern = /<([a-zA-Z_]+):(\d+)(?::\w+)?>/g;
-    let match;
+  while (offset < file.size) {
+    const end = Math.min(offset + chunkSize, file.size);
+    const bytes = await file.slice(offset, end).arrayBuffer();
+    buffer += decoder.decode(bytes, { stream: end < file.size });
+    offset = end;
 
-    while ((match = fieldPattern.exec(chunk)) !== null) {
-      const rawField = match[1].toUpperCase();
-      const length = parseInt(match[2], 10);
-      const valueStart = fieldPattern.lastIndex;
-      const value = chunk.slice(valueStart, valueStart + length);
-      fieldPattern.lastIndex = valueStart + length;
-
-      const dbField = ADIF_TO_DB_MAP[rawField];
-      if (dbField) {
-        // 数字字段转换
-        if (['my_lat', 'my_lon'].includes(dbField)) {
-          const coordinate = parseAdifCoordinate(value);
-          if (coordinate !== null) record[dbField] = coordinate;
-        } else if (['my_alt', 'frequency'].includes(dbField)) {
-          const num = parseFloat(value.trim());
-          if (!isNaN(num)) {
-            record[dbField] = num;
-          }
-        } else {
-          record[dbField] = value.trim();
-        }
+    if (!headerResolved) {
+      const headerEnd = findControlTagEnd(buffer, 'eoh');
+      if (headerEnd >= 0) {
+        const header = buffer.slice(0, headerEnd);
+        isLegacyHamLogbookExport = /<PROGRAMID:\d+(?::[^>]*)?>hamlogbook/i.test(header);
+        buffer = buffer.slice(headerEnd);
+        headerResolved = true;
+      } else if (findControlTagEnd(buffer, 'eor') >= 0) {
+        // 允许没有 EOH 的最简 ADIF。
+        headerResolved = true;
+      } else if (buffer.length > 1024 * 1024) {
+        throw new Error('ADIF 文件头超过 1 MB 或缺少 EOH/EOR');
       }
     }
 
-    // CALL 是 QSO 的身份字段；其余必填项在导入流程中进一步校验或补全。
-    if (record.callsign) {
-      records.push(record);
+    if (headerResolved) {
+      const records = drainAdifRecordBuffer(buffer, isLegacyHamLogbookExport);
+      buffer = records.remainder;
+      for (const record of records.values) yield record;
+      if (buffer.length > 2 * 1024 * 1024) throw new Error('单条 ADIF 记录超过 2 MB');
     }
   }
 
-  return records;
+  buffer += decoder.decode();
+  if (!headerResolved && buffer.trim()) {
+    const records = parseADIF(buffer, { isLegacyHamLogbookExport: false });
+    for (const record of records) yield record;
+    return;
+  }
+  const finalRecords = drainAdifRecordBuffer(buffer, isLegacyHamLogbookExport);
+  for (const record of finalRecords.values) yield record;
+  // 与 parseADIF 保持一致：第三方导出的最后一条记录即使缺少 EOR，
+  // 只要所有字段长度完整且含 CALL，也应被导入。
+  if (finalRecords.remainder.trim()) {
+    const trailing = parseAdifRecord(finalRecords.remainder, isLegacyHamLogbookExport);
+    if (trailing.complete && trailing.record?.callsign) yield trailing.record;
+  }
+}
+
+function drainAdifRecordBuffer(text, isLegacyHamLogbookExport) {
+  const values = [];
+  let remainder = text;
+  while (true) {
+    const recordEnd = findControlTagEnd(remainder, 'eor');
+    if (recordEnd < 0) break;
+    const recordText = remainder.slice(0, recordEnd);
+    remainder = remainder.slice(recordEnd);
+    const parsed = parseAdifRecord(recordText, isLegacyHamLogbookExport);
+    if (parsed.record?.callsign) values.push(parsed.record);
+  }
+  return { values, remainder };
+}
+
+/**
+ * 查找真正位于字段边界的 EOH/EOR。字段值按声明长度跳过，因此备注中出现
+ * “<EOR>”文本时不会被误判为记录结束。
+ */
+function findControlTagEnd(text, tagName) {
+  let position = 0;
+  const controlPattern = new RegExp(`<${tagName}\\s*>`, 'iy');
+  const fieldPattern = /<([a-zA-Z0-9_]+):(\d+)(?::[^>]*)?>/iy;
+
+  while (position < text.length) {
+    const tagStart = text.indexOf('<', position);
+    if (tagStart < 0) return -1;
+
+    controlPattern.lastIndex = tagStart;
+    const control = controlPattern.exec(text);
+    if (control) return controlPattern.lastIndex;
+
+    fieldPattern.lastIndex = tagStart;
+    const field = fieldPattern.exec(text);
+    if (field) {
+      const valueEnd = fieldPattern.lastIndex + Number(field[2]);
+      if (valueEnd > text.length) return -1;
+      position = valueEnd;
+      continue;
+    }
+
+    // 可能是另一控制标签（例如搜索 EOR 时遇到 EOH）或无关文本。
+    const tagEnd = text.indexOf('>', tagStart + 1);
+    if (tagEnd < 0) return -1;
+    position = tagEnd + 1;
+  }
+  return -1;
+}
+
+function parseAdifRecord(text, isLegacyHamLogbookExport) {
+  const record = {};
+  const fieldPattern = /<([a-zA-Z0-9_]+):(\d+)(?::[^>]*)?>/iy;
+  let position = 0;
+
+  while (position < text.length) {
+    const tagStart = text.indexOf('<', position);
+    if (tagStart < 0) break;
+    fieldPattern.lastIndex = tagStart;
+    const match = fieldPattern.exec(text);
+    if (!match) {
+      const tagEnd = text.indexOf('>', tagStart + 1);
+      if (tagEnd < 0) return { record: null, complete: false };
+      position = tagEnd + 1;
+      continue;
+    }
+
+    const valueEnd = fieldPattern.lastIndex + Number(match[2]);
+    if (valueEnd > text.length) return { record: null, complete: false };
+    applyParsedField(record, match[1].toUpperCase(), text.slice(fieldPattern.lastIndex, valueEnd));
+    position = valueEnd;
+  }
+
+  if (isLegacyHamLogbookExport && record.qsl_considered === undefined && (record._legacyQslSent !== undefined || record._legacyQslRcvd !== undefined)) {
+    record.qsl_considered = record._legacyQslSent === 'Y' && record._legacyQslRcvd === 'Y' ? 1 : 0;
+  }
+  delete record._legacyQslSent;
+  delete record._legacyQslRcvd;
+  return { record, complete: true };
+}
+
+function applyParsedField(record, rawField, value) {
+  // 旧版曾错误将“考虑交换”写入实际 QSL 已收/已发字段；导入时仅作兼容迁移。
+  if (rawField === 'QSL_SENT') {
+    record._legacyQslSent = value.trim().toUpperCase();
+    return;
+  }
+  if (rawField === 'QSL_RCVD') {
+    record._legacyQslRcvd = value.trim().toUpperCase();
+    return;
+  }
+  if (rawField === 'APP_HAMLOG_QSL_CONSIDERED') {
+    record.qsl_considered = value.trim().toUpperCase() === 'Y' ? 1 : 0;
+    return;
+  }
+
+  const dbField = ADIF_TO_DB_MAP[rawField];
+  if (!dbField) return;
+  if (['my_lat', 'my_lon'].includes(dbField)) {
+    const coordinate = parseAdifCoordinate(value);
+    if (coordinate !== null) record[dbField] = coordinate;
+  } else if (['my_alt', 'frequency'].includes(dbField)) {
+    const number = parseFloat(value.trim());
+    if (!Number.isNaN(number)) record[dbField] = number;
+  } else {
+    record[dbField] = value.trim();
+  }
 }
 
 /**
@@ -127,24 +259,36 @@ export function parseADIF(text) {
  * @param {Array<Object>} qsos - QSO 记录数组（数据库字段命名）
  * @returns {string} 完整的 ADIF 文件内容
  */
-export function generateADIF(qsos) {
-  const lines = [];
+export function generateADIF(qsos, options = {}) {
+  const records = generateADIFRecords(qsos, options);
+  return records ? `${generateADIFHeader()}\r\n${records}` : generateADIFHeader();
+}
 
-  // 文件头
-  lines.push('Ham Radio Logbook Export');
-  lines.push('<ADIF_VER:5>3.1.4');
-  lines.push('<PROGRAMID:10>hamlogbook');
-  lines.push('<PROGRAMVERSION:5>1.0.0');
-  lines.push('<EOH>');
+/** 生成一次写入的 ADIF 文件头。 */
+export function generateADIFHeader() {
+  return [
+    'Ham Radio Logbook Export',
+    '<ADIF_VER:5>3.1.4',
+    '<PROGRAMID:10>hamlogbook',
+    '<PROGRAMVERSION:5>1.1.0',
+    '<EOH>'
+  ].join('\r\n');
+}
+
+/** 只生成记录段，供大型日志分页、分块写入。 */
+export function generateADIFRecords(qsos, options = {}) {
+  const lines = [];
+  const includeStationCoordinates = options.includeStationCoordinates !== false;
 
   // 每条 QSO 记录
-  for (const qso of qsos) {
+  for (const qso of qsos || []) {
     const fields = [];
 
     for (const [dbField, value] of Object.entries(qso)) {
       // 跳过空值和内部字段
       if (value === null || value === undefined || value === '') continue;
       if (['id', 'created_at', 'updated_at'].includes(dbField)) continue;
+      if (!includeStationCoordinates && ['my_lat', 'my_lon'].includes(dbField)) continue;
 
       const adifField = DB_TO_ADIF_MAP[dbField];
       if (!adifField) continue;
@@ -160,6 +304,9 @@ export function generateADIF(qsos) {
       // ADIF 3.1.4: 长度使用字符数（非字节数）
       fields.push(`<${adifField}:${strValue.length}>${strValue}`);
     }
+
+    const qslStatus = Number(qso.qsl_considered) === 1 ? 'Y' : 'N';
+    fields.push(`<APP_HAMLOG_QSL_CONSIDERED:1>${qslStatus}`);
 
     if (fields.length > 0) {
       lines.push(fields.join('') + '<EOR>');

@@ -1,6 +1,6 @@
 /* ============================================================
    splash.js - Android 原生启动页设置桥接
-   设置页保留五种预览；真正启动页由原生 NativeSplashView 绘制。
+   设置页保留五种预览；系统启动窗口之后由 NativeSplashView 保证显示用户所选方案。
    ============================================================ */
 
 export const SPLASH_STYLE_KEY = 'hamlog_splash_style';
@@ -30,23 +30,30 @@ function getNativeSplashPlugin() {
 export async function syncNativeSplashStyle(style = getSplashStyle()) {
   const normalized = normalizeStyle(style);
   const plugin = getNativeSplashPlugin();
-  if (!plugin?.setStyle) return normalized;
+  if (!plugin?.setStyle) {
+    return { style: normalized, nativeAvailable: false, systemThemeApplied: false };
+  }
   try {
-    await plugin.setStyle({ style: normalized });
+    const result = await plugin.setStyle({ style: normalized });
+    return {
+      style: normalized,
+      nativeAvailable: true,
+      systemThemeApplied: result?.systemThemeApplied === true,
+      takesEffectNextColdStart: result?.takesEffectNextColdStart === true
+    };
   } catch (error) {
     console.warn('同步原生启动页设置失败:', error);
+    return { style: normalized, nativeAvailable: true, systemThemeApplied: false, error };
   }
-  return normalized;
 }
 
-export function setSplashStyle(style) {
+export async function setSplashStyle(style) {
   const normalized = normalizeStyle(style);
   localStorage.setItem(SPLASH_STYLE_KEY, normalized);
-  void syncNativeSplashStyle(normalized);
-  return normalized;
+  return syncNativeSplashStyle(normalized);
 }
 
-/** 首页首帧就绪后关闭 Android 原生覆盖层；浏览器预览时自动跳过。 */
+/** 首页首帧就绪后关闭用户所选的 Android 原生覆盖层；浏览器预览时自动跳过。 */
 export async function hideNativeSplash() {
   const plugin = getNativeSplashPlugin();
   if (!plugin?.hide) return;
@@ -60,6 +67,7 @@ export async function hideNativeSplash() {
 export function renderSplashStyleOptions(container, selectedStyle, onSelect) {
   if (!container) return;
   const selected = normalizeStyle(selectedStyle);
+  let latestSelectionRequest = 0;
   container.innerHTML = SPLASH_STYLES.map(item => `
     <label class="splash-style-option ${item.id === selected ? 'is-selected' : ''}">
       <input type="radio" name="splash-style" value="${item.id}" ${item.id === selected ? 'checked' : ''}>
@@ -72,12 +80,15 @@ export function renderSplashStyleOptions(container, selectedStyle, onSelect) {
     </label>`).join('');
 
   container.querySelectorAll('input[name="splash-style"]').forEach(input => {
-    input.addEventListener('change', event => {
-      const next = setSplashStyle(event.target.value);
+    input.addEventListener('change', async event => {
+      const requestId = ++latestSelectionRequest;
+      const result = await setSplashStyle(event.target.value);
+      if (requestId !== latestSelectionRequest) return;
+      const next = result.style;
       container.querySelectorAll('.splash-style-option').forEach(option => {
         option.classList.toggle('is-selected', option.querySelector('input')?.value === next);
       });
-      if (typeof onSelect === 'function') onSelect(next);
+      if (typeof onSelect === 'function') onSelect(next, result);
     });
   });
 }

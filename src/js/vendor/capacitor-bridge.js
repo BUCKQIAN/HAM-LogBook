@@ -95,17 +95,14 @@ window.SQLiteConnection.prototype.createConnection = function(database, encrypte
     var self = this;
     var db = database;
     if (db && db.endsWith && db.endsWith('.db')) db = db.slice(0, -3);
-    console.log('Bridge createConnection:', db, encrypted, mode, version, readonly);
     return self.sqlite.createConnection({ database: db, encrypted: encrypted, mode: mode, version: version, readonly: readonly })
     .then(function(res) {
-        console.log('Bridge createConnection OK, result:', JSON.stringify(res));
         var conn = new window.SQLiteDBConnection(db, readonly, self.sqlite);
         var connName = readonly ? 'RO_' + db : 'RW_' + db;
         self._connectionDict.set(connName, conn);
         return Promise.resolve(conn);
     })
     .catch(function(err) {
-        console.error('Bridge createConnection FAILED:', err, typeof err, JSON.stringify(err));
         throw err;
     });
 };
@@ -183,7 +180,6 @@ window.FilesystemEncoding = { UTF8: 'utf8', ASCII: 'ascii', UTF16: 'utf16' };
 
 	// 验证 Filesystem 插件核心方法（不可用时提供明确报错）
 	if (!window.FilesystemPlugin.mkdir || !window.FilesystemPlugin.writeFile) {
-	  console.warn('Filesystem plugin missing methods');
 	  window.FilesystemPlugin.mkdir = window.FilesystemPlugin.mkdir || function() {
 	    return Promise.reject(new Error('文件系统不可用，请授予存储权限后重试'));
 	  };
@@ -192,7 +188,6 @@ window.FilesystemEncoding = { UTF8: 'utf8', ASCII: 'ascii', UTF16: 'utf16' };
 	  };
 	}
 
-console.log('Capacitor bridge ready');
 })();
 
 // ===== 诊断信息 =====
@@ -234,5 +229,3 @@ window._waitForCapacitor = function(timeoutMs) {
     check();
   });
 };
-
-console.log('Bridge diag:', JSON.stringify(window._bridgeDiag, null, 2));

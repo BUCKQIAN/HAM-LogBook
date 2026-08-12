@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
   <title>HAM Logbook - 新建 QSO</title>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/theme.js"></script>
@@ -47,7 +48,16 @@
           <label for="callsign">呼号 *</label>
           <div class="callsign-row">
             <input class="uppercase-input" type="text" id="callsign" placeholder="例如 BH4ABC/P" autocomplete="off" autocapitalize="characters">
-            <button class="btn-icon" id="lookup-btn" title="查询呼号">🔍</button>
+            <button class="btn-icon btn-icon-secondary" type="button" id="counterpart-history-btn" title="查询历史对方资料" aria-label="查询历史对方资料" aria-controls="counterpart-profile-panel">🕘</button>
+            <button class="btn-icon" type="button" id="lookup-btn" title="查询 HamQTH 呼号信息">🔍</button>
+          </div>
+          <p class="helper-text">输入完整呼号后，可点击 🕘 手动查询以往通联资料；不会自动访问数据库。</p>
+          <div class="counterpart-profile-panel" id="counterpart-profile-panel" hidden>
+            <div class="counterpart-profile-header">
+              <strong id="counterpart-profile-title">历史对方资料</strong>
+              <button class="counterpart-profile-close" type="button" id="counterpart-profile-close" aria-label="关闭历史资料">×</button>
+            </div>
+            <div class="counterpart-profile-list" id="counterpart-profile-list"></div>
           </div>
         </div>
       </div>
@@ -76,8 +86,6 @@
             <label for="band">频段</label>
             <select id="band">
               <option value="">选择频段</option>
-              <option value="2m">2m</option><option value="70cm">70cm</option>
-              <option value="6m">6m</option>
             </select>
           </div>
           <div class="field">
@@ -134,13 +142,20 @@
         </div>
         <div class="field-row">
           <div class="field">
+            <label for="my-rig">我的设备</label>
+            <input type="text" id="my-rig" list="my-rigs-list" autocomplete="off">
+            <datalist id="my-rigs-list"></datalist>
+          </div>
+          <div class="field">
             <label for="my-power">我的功率</label>
             <input type="text" id="my-power" autocomplete="off">
           </div>
           <div class="field">
-            <label for="my-rig">我的设备</label>
-            <input type="text" id="my-rig" list="my-rigs-list" autocomplete="off">
-            <datalist id="my-rigs-list"></datalist>
+            <label for="qsl-considered">是否考虑交换 QSL</label>
+            <select id="qsl-considered">
+              <option value="0">未考虑</option>
+              <option value="1">考虑交换</option>
+            </select>
           </div>
         </div>
       </div>
@@ -198,16 +213,25 @@
 
   </div>
 
+  <div class="app-dialog-backdrop" id="draft-leave-dialog" hidden>
+    <section class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="draft-leave-title" aria-describedby="draft-leave-description">
+      <h2 id="draft-leave-title">确定离开此页面？</h2>
+      <p id="draft-leave-description">当前通联尚未完成。你可以保留草稿暂时离开，或删除草稿后离开。</p>
+      <div class="draft-leave-actions">
+        <button class="dialog-button dialog-button-danger" type="button" id="draft-leave-delete">删除草稿</button>
+        <button class="dialog-button" type="button" id="draft-leave-temporary">暂时离开</button>
+        <button class="dialog-button dialog-button-primary" type="button" id="draft-leave-continue">继续通联</button>
+      </div>
+    </section>
+  </div>
+
   <!-- 底部导航栏容器 -->
   <div id="nav-container"></div>
 
   <!-- Capacitor 原生插件桥接 -->
   <script type="module" src="js/vendor/capacitor-bridge.js"></script>
   <script type="module" src="js/nav.js"></script>
-  <script type="module">
-    import { initPage } from './js/app.js';
-    document.addEventListener('DOMContentLoaded', initPage);
-  </script>
+  <script type="module" src="js/page-entry.js"></script>
 
 </body>
 </html>

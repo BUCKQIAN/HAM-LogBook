@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
   <title>HAM Logbook - 中继台</title>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/theme.js"></script>
@@ -44,44 +45,44 @@
         <div class="field-row">
           <div class="field">
             <label for="repeater-tx-tone">发射亚音 <span class="optional-note">可不填</span></label>
-            <input type="text" id="repeater-tx-tone" list="tone-presets" placeholder="例 88.5" autocomplete="off">
+            <input type="text" id="repeater-tx-tone" list="tone-presets" placeholder="例 T88.5" autocomplete="off">
           </div>
           <div class="field">
             <label for="repeater-rx-tone">接收亚音 <span class="optional-note">可不填</span></label>
-            <input type="text" id="repeater-rx-tone" list="tone-presets" placeholder="例 88.5" autocomplete="off">
+            <input type="text" id="repeater-rx-tone" list="tone-presets" placeholder="例 T88.5" autocomplete="off">
           </div>
         </div>
         <datalist id="tone-presets">
-          <option value="67.0"><option value="69.3"><option value="71.9"><option value="74.4">
-          <option value="77.0"><option value="79.7"><option value="82.5"><option value="85.4">
-          <option value="88.5"><option value="91.5"><option value="94.8"><option value="97.4">
-          <option value="100.0"><option value="103.5"><option value="107.2"><option value="110.9">
-          <option value="114.8"><option value="118.8"><option value="123.0"><option value="127.3">
-          <option value="131.8"><option value="136.5"><option value="141.3"><option value="146.2">
-          <option value="151.4"><option value="156.7"><option value="162.2"><option value="167.9">
-          <option value="173.8"><option value="179.9"><option value="186.2"><option value="192.8">
-          <option value="203.5"><option value="210.7"><option value="218.1"><option value="225.7">
-          <option value="233.6"><option value="241.8"><option value="250.3"><option value="254.1">
-          <option value="DCS023"><option value="DCS032"><option value="DCS043"><option value="DCS051">
-          <option value="DCS054"><option value="DCS065"><option value="DCS071"><option value="DCS072">
-          <option value="DCS073"><option value="DCS074"><option value="DCS114"><option value="DCS115">
-          <option value="DCS116"><option value="DCS125"><option value="DCS131"><option value="DCS132">
-          <option value="DCS134"><option value="DCS143"><option value="DCS152"><option value="DCS155">
-          <option value="DCS156"><option value="DCS162"><option value="DCS165"><option value="DCS172">
-          <option value="DCS174"><option value="DCS205"><option value="DCS223"><option value="DCS226">
-          <option value="DCS243"><option value="DCS244"><option value="DCS245"><option value="DCS251">
-          <option value="DCS261"><option value="DCS263"><option value="DCS265"><option value="DCS271">
-          <option value="DCS306"><option value="DCS311"><option value="DCS315"><option value="DCS331">
-          <option value="DCS343"><option value="DCS346"><option value="DCS351"><option value="DCS364">
-          <option value="DCS365"><option value="DCS371"><option value="DCS411"><option value="DCS412">
-          <option value="DCS413"><option value="DCS423"><option value="DCS431"><option value="DCS432">
-          <option value="DCS445"><option value="DCS464"><option value="DCS465"><option value="DCS466">
-          <option value="DCS503"><option value="DCS506"><option value="DCS516"><option value="DCS532">
-          <option value="DCS546"><option value="DCS565"><option value="DCS606"><option value="DCS612">
-          <option value="DCS624"><option value="DCS627"><option value="DCS631"><option value="DCS632">
-          <option value="DCS654"><option value="DCS662"><option value="DCS664"><option value="DCS703">
-          <option value="DCS712"><option value="DCS723"><option value="DCS731"><option value="DCS732">
-          <option value="DCS734"><option value="DCS743"><option value="DCS754">
+          <option value="T67.0"><option value="T69.3"><option value="T71.9"><option value="T74.4">
+          <option value="T77.0"><option value="T79.7"><option value="T82.5"><option value="T85.4">
+          <option value="T88.5"><option value="T91.5"><option value="T94.8"><option value="T97.4">
+          <option value="T100.0"><option value="T103.5"><option value="T107.2"><option value="T110.9">
+          <option value="T114.8"><option value="T118.8"><option value="T123.0"><option value="T127.3">
+          <option value="T131.8"><option value="T136.5"><option value="T141.3"><option value="T146.2">
+          <option value="T151.4"><option value="T156.7"><option value="T162.2"><option value="T167.9">
+          <option value="T173.8"><option value="T179.9"><option value="T186.2"><option value="T192.8">
+          <option value="T203.5"><option value="T210.7"><option value="T218.1"><option value="T225.7">
+          <option value="T233.6"><option value="T241.8"><option value="T250.3"><option value="T254.1">
+          <option value="D023N"><option value="D032N"><option value="D043N"><option value="D051N">
+          <option value="D054N"><option value="D065N"><option value="D071N"><option value="D072N">
+          <option value="D073N"><option value="D074N"><option value="D114N"><option value="D115N">
+          <option value="D116N"><option value="D125N"><option value="D131N"><option value="D132N">
+          <option value="D134N"><option value="D143N"><option value="D152N"><option value="D155N">
+          <option value="D156N"><option value="D162N"><option value="D165N"><option value="D172N">
+          <option value="D174N"><option value="D205N"><option value="D223N"><option value="D226N">
+          <option value="D243N"><option value="D244N"><option value="D245N"><option value="D251N">
+          <option value="D261N"><option value="D263N"><option value="D265N"><option value="D271N">
+          <option value="D306N"><option value="D311N"><option value="D315N"><option value="D331N">
+          <option value="D343N"><option value="D346N"><option value="D351N"><option value="D364N">
+          <option value="D365N"><option value="D371N"><option value="D411N"><option value="D412N">
+          <option value="D413N"><option value="D423N"><option value="D431N"><option value="D432N">
+          <option value="D445N"><option value="D464N"><option value="D465N"><option value="D466N">
+          <option value="D503N"><option value="D506N"><option value="D516N"><option value="D532N">
+          <option value="D546N"><option value="D565N"><option value="D606N"><option value="D612N">
+          <option value="D624N"><option value="D627N"><option value="D631N"><option value="D632N">
+          <option value="D654N"><option value="D662N"><option value="D664N"><option value="D703N">
+          <option value="D712N"><option value="D723N"><option value="D731N"><option value="D732N">
+          <option value="D734N"><option value="D743N"><option value="D754N">
         </datalist>
         <div class="field">
           <label for="repeater-location">位置描述</label>
@@ -114,10 +115,7 @@
   <!-- Capacitor 原生插件桥接 -->
   <script type="module" src="js/vendor/capacitor-bridge.js"></script>
   <script type="module" src="js/nav.js"></script>
-  <script type="module">
-    import { initPage } from './js/repeater.js';
-    document.addEventListener('DOMContentLoaded', initPage);
-  </script>
+  <script type="module" src="js/page-entry.js"></script>
 
 </body>
 </html>

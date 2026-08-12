@@ -7,6 +7,7 @@ import { initDatabase, getAllRepeaters, saveRepeater, updateRepeater, deleteRepe
 import { isValidTone, normalizeTone } from './radio.js';
 
 let editRepeaterId = null;
+let currentRepeaters = [];
 
 export async function initPage() {
   bindEvents();
@@ -22,6 +23,17 @@ export async function initPage() {
 function bindEvents() {
   document.getElementById('repeater-save-btn')?.addEventListener('click', handleSave);
   document.getElementById('repeater-cancel-btn')?.addEventListener('click', handleCancel);
+  document.getElementById('repeater-list')?.addEventListener('click', async event => {
+    const target = event.target.closest('[data-repeater-action]');
+    if (!target) return;
+    const id = Number(target.dataset.repeaterId);
+    const repeater = currentRepeaters.find(item => Number(item.id) === id);
+    if (!repeater) return;
+    const action = target.dataset.repeaterAction;
+    if (action === 'edit') startEdit(repeater);
+    else if (action === 'apply') applyRepeater(repeater);
+    else if (action === 'delete') await removeRepeater(repeater);
+  });
 }
 
 async function handleSave() {
@@ -59,9 +71,11 @@ async function handleSave() {
   const txTone = normalizeTone(document.getElementById('repeater-tx-tone')?.value);
   const rxTone = normalizeTone(document.getElementById('repeater-rx-tone')?.value);
   if (!isValidTone(txTone) || !isValidTone(rxTone)) {
-    window.showToast('亚音格式应为 88.5 或 DCS023');
+    window.showToast('亚音格式应为 T88.5 或 D023N / D023I');
     return;
   }
+  document.getElementById('repeater-tx-tone').value = txTone;
+  document.getElementById('repeater-rx-tone').value = rxTone;
 
   const data = {
     name: name,
@@ -109,8 +123,8 @@ function startEdit(repeater) {
   document.getElementById('repeater-name').value = repeater.name || '';
   document.getElementById('repeater-rx').value = repeater.rx_frequency ?? '';
   document.getElementById('repeater-tx').value = repeater.tx_frequency ?? '';
-  document.getElementById('repeater-tx-tone').value = repeater.tx_tone || '';
-  document.getElementById('repeater-rx-tone').value = repeater.rx_tone || '';
+  document.getElementById('repeater-tx-tone').value = normalizeTone(repeater.tx_tone);
+  document.getElementById('repeater-rx-tone').value = normalizeTone(repeater.rx_tone);
   document.getElementById('repeater-location').value = repeater.location || '';
   document.getElementById('repeater-notes').value = repeater.notes || '';
   const saveBtn = document.getElementById('repeater-save-btn');
@@ -125,6 +139,7 @@ async function loadRepeaterList() {
   if (!listContainer) return;
   try {
     const repeaters = await getAllRepeaters();
+    currentRepeaters = repeaters;
     if (repeaters.length === 0) {
       listContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><div class="empty-text">暂无中继台</div></div>`;
       return;
@@ -137,39 +152,40 @@ async function loadRepeaterList() {
       if (r.rx_tone) meta.push(`RX ${r.rx_tone}`);
       if (r.location) meta.push(r.location);
       return `<div class="repeater-item">
-        <div class="repeater-item-main" onclick="window._startEditRepeater(${r.id})">
+        <div class="repeater-item-main" data-repeater-action="edit" data-repeater-id="${r.id}">
           <div class="repeater-item-name">${escapeHtml(r.name)}</div>
           <div class="repeater-item-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join('')}</div>
         </div>
         <div class="repeater-item-actions">
-          <button class="btn-small btn-apply" onclick="window._applyRepeater(${r.id})">应用</button>
-          <button class="btn-small btn-delete" onclick="window._deleteRepeater(${r.id})">删除</button>
+          <button class="btn-small btn-apply" data-repeater-action="apply" data-repeater-id="${r.id}">应用</button>
+          <button class="btn-small btn-delete" data-repeater-action="delete" data-repeater-id="${r.id}">删除</button>
         </div>
       </div>`;
     }).join('');
-    registerGlobalCallbacks(repeaters);
   } catch (error) {
     console.error('加载中继台列表失败:', error);
     window.showToast('加载失败：' + error.message);
   }
 }
 
-function registerGlobalCallbacks(repeaters) {
-  window._startEditRepeater = id => { const r = repeaters.find(x => x.id === id); if (r) startEdit(r); };
-  window._applyRepeater = id => {
-    const r = repeaters.find(x => x.id === id);
-    if (r && r.rx_frequency != null) {
-      localStorage.setItem('hamlog_repeater_preset', JSON.stringify({ frequency: r.rx_frequency }));
-      window.location.href = 'index.html';
-    } else {
-      window.showToast('该中继台未设置接收频率');
-    }
-  };
-  window._deleteRepeater = async id => {
-    if (!confirm('确定要删除此中继台吗？')) return;
-    try { await deleteRepeater(id); window.showToast('已删除'); await loadRepeaterList(); }
-    catch (error) { window.showToast('删除失败：' + error.message); }
-  };
+function applyRepeater(repeater) {
+  if (repeater.rx_frequency != null) {
+    localStorage.setItem('hamlog_repeater_preset', JSON.stringify({ frequency: repeater.rx_frequency }));
+    window.location.href = 'index.html';
+  } else {
+    window.showToast('该中继台未设置接收频率');
+  }
+}
+
+async function removeRepeater(repeater) {
+  if (!confirm('确定要删除此中继台吗？')) return;
+  try {
+    await deleteRepeater(repeater.id);
+    window.showToast('已删除');
+    await loadRepeaterList();
+  } catch (error) {
+    window.showToast('删除失败：' + error.message);
+  }
 }
 
 function escapeHtml(str) {

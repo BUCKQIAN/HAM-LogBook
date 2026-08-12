@@ -3,168 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
   <title>HAM Logbook - 设置</title>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/theme.js"></script>
 </head>
-<body>
+<body data-settings-page="home">
 
-  <!-- 顶部标题栏 -->
   <div class="top-bar">
     <div class="top-bar-copy"><span class="top-brand">HAM LOGBOOK</span><h1>设置</h1></div>
     <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换主题">☾</button>
   </div>
 
-  <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
-  <!-- 内容区 -->
   <div class="content">
-
-    <div class="settings-section">
-      <h3>外观</h3>
-      <div class="card">
-        <div class="appearance-row">
-          <div><strong data-theme-label>白昼模式</strong><span>纸张与墨色</span></div>
-          <button class="theme-switch-button" type="button" data-theme-toggle aria-label="切换主题">☾</button>
-        </div>
-      </div>
+    <div class="settings-menu" aria-label="设置分类">
+      <a class="settings-menu-item" href="settings-splash.html">
+        <span><strong>启动页风格</strong><small>外观模式与五种启动方案</small></span>
+        <span class="settings-menu-arrow" aria-hidden="true">›</span>
+      </a>
+      <a class="settings-menu-item" href="settings-station.html">
+        <span><strong>台站资料、数据预设和默认 QTH</strong><small>台站呼号、操作证类别、设备与位置</small></span>
+        <span class="settings-menu-arrow" aria-hidden="true">›</span>
+      </a>
+      <a class="settings-menu-item" href="settings-data.html">
+        <span><strong>呼号查询源、数据管理</strong><small>HamQTH、ADIF 与个人信息迁移</small></span>
+        <span class="settings-menu-arrow" aria-hidden="true">›</span>
+      </a>
     </div>
 
-    <!-- 启动页风格 -->
-    <div class="settings-section">
-      <h3>启动页风格</h3>
-      <div class="card">
-        <div class="card-content">
-          <p class="helper-text">选择会保存到 Android 原生设置，并在下次真正启动软件时生效。</p>
-          <div id="splash-style-options" class="splash-style-grid"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 台站资料 -->
-    <div class="settings-section">
-      <h3>台站资料</h3>
-      <div class="card">
-        <div class="card-content">
-          <div class="field">
-            <label for="station-callsign">我的台站呼号</label>
-            <input class="uppercase-input" type="text" id="station-callsign" placeholder="例如 BH4ABC/P" autocomplete="off" autocapitalize="characters">
-            <p class="helper-text">保存后写入新记录的 STATION_CALLSIGN 字段，使 ADIF 文件更完整。</p>
-          </div>
-          <button class="btn-small btn-apply" id="save-station-btn">保存台站资料</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 默认 QTH -->
-    <div class="settings-section">
-      <h3>默认 QTH（我的位置）</h3>
-      <div class="card">
-        <div class="card-content">
-          <div class="field-row">
-            <div class="field">
-              <label for="default-lat">纬度</label>
-              <input type="text" id="default-lat" placeholder="例 31.2304" autocomplete="off">
-            </div>
-            <div class="field">
-              <label for="default-lon">经度</label>
-              <input type="text" id="default-lon" placeholder="例 121.4737" autocomplete="off">
-            </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="default-alt">海拔 (m)</label>
-              <input type="text" id="default-alt" inputmode="decimal" autocomplete="off">
-            </div>
-            <div class="field">
-              <label for="default-locator">网格坐标</label>
-              <input class="uppercase-input" type="text" id="default-locator" placeholder="自动计算" autocomplete="off" autocapitalize="characters" spellcheck="false">
-            </div>
-          </div>
-          <button class="btn-small btn-apply" id="save-qth-btn">💾 保存默认位置</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- HamQTH 账号 -->
-    <div class="settings-section">
-      <h3>呼号查询源（HamQTH）</h3>
-      <div class="card">
-        <div class="card-content">
-          <p class="helper-text">可选配置。未填写账号时仍可正常离线保存 QSO，仅停用联网呼号查询。</p>
-          <div class="field">
-            <label for="hamqth-user">用户名</label>
-            <input type="text" id="hamqth-user" placeholder="HamQTH 用户名" autocomplete="off">
-          </div>
-          <div class="field">
-            <label for="hamqth-pass">密码</label>
-            <input type="password" id="hamqth-pass" placeholder="HamQTH 密码" autocomplete="off">
-          </div>
-          <button class="btn-small btn-apply" id="save-account-btn">💾 保存账号</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 我的设备预设 -->
-    <div class="settings-section">
-      <h3>我的设备预设</h3>
-      <div class="card">
-        <div class="card-content">
-          <div class="field">
-            <label for="my-rigs-input">设备列表（每行一个，通联时可快速选择）</label>
-            <textarea id="my-rigs-input" rows="4"></textarea>
-          </div>
-          <button class="btn-small btn-apply" id="save-rigs-btn">💾 保存设备列表</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 数据管理 -->
-    <div class="settings-section">
-      <h3>数据管理</h3>
-      <div class="card">
-        <div class="card-content">
-          <p class="helper-text">本地数据库位于应用私有空间；导入通过系统文件选择器完成，无需授予整盘存储权限。</p>
-          <button class="btn btn-primary" id="export-adif-btn">📤 导出 ADIF</button>
-          <div class="field">
-            <label for="adif-file">📥 导入 ADIF（选择 .adi 文件）</label>
-            <input type="file" id="adif-file" accept=".adi,.adif,.txt">
-          </div>
-          <button class="btn btn-secondary" id="share-adif-btn">📲 分享日志</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 关于 -->
-    <div class="settings-section">
+    <div class="settings-section settings-about-section">
       <h3>关于</h3>
       <div class="card">
         <div class="card-content">
           <div class="about-info">
             <strong>HAM Logbook</strong> — 业余无线电通联日志<br>
-            版本：<strong>1.0.0</strong><br>
+            版本：<strong>1.1.0</strong><br>
             数据格式：<strong>ADIF 3.1.4</strong><br>
             兼容：Logger32 / N1MM / Wavelog<br>
-            项目地址：<a href="https://github.com/BUCKQIAN/HAM-LogBook" style="color:#60a5fa;">https://github.com/BUCKQIAN/HAM-LogBook</a><br>
+            项目地址：<a href="https://github.com/BUCKQIAN/HAM-LogBook">https://github.com/BUCKQIAN/HAM-LogBook</a><br>
             离线优先 · 隐私安全 · 开源免费
           </div>
         </div>
       </div>
     </div>
-
   </div>
 
-  <!-- 底部导航栏容器 -->
   <div id="nav-container"></div>
-
-  <!-- Capacitor 原生插件桥接 -->
-  <script type="module" src="js/vendor/capacitor-bridge.js"></script>
   <script type="module" src="js/nav.js"></script>
-  <script type="module">
-    import { initPage } from './js/settings.js';
-    document.addEventListener('DOMContentLoaded', initPage);
-  </script>
-
 </body>
 </html>
