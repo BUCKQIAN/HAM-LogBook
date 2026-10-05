@@ -150,6 +150,13 @@ try {
   assert.ok(readyIndex > launchEvents.findLastIndex(event => event.type === 'style'));
   assert.ok(readyIndex > launchEvents.findLastIndex(event => event.type === 'theme'));
   assert.equal(launchEvents.filter(event => event.type === 'style').at(-1).style, 'D');
+  // 未选时保留提示；打开频段列表只显示实际可选频段，取消不会代选。
+  assert.equal(await page.locator('#band').inputValue(), '');
+  await page.getByRole('button', { name: '频段：选择频段', exact: true }).click();
+  assert.equal(await page.getByRole('dialog').getByRole('button', { name: '选择频段', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('dialog').getByRole('button', { name: '2m', exact: true }).count(), 1);
+  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal(await page.locator('#band').inputValue(), '');
   await go(`${base}/settings-station.html`);
   assert.equal(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), true);
   await page.locator('#my-rigs-input').fill('FT-60\nIC-705');
@@ -334,7 +341,7 @@ try {
     await route.fulfill({ contentType: 'application/xml', headers: { 'Access-Control-Allow-Origin': '*' }, body: `<QRZDatabase xmlns="http://xmldata.qrz.com">${xml}</QRZDatabase>` });
   });
   await go(`${base}/settings-data.html`);
-  await choose('查询源', 'QRZ（普通账号可尝试有限查询）');
+  await choose('查询源', 'QRZ.com（普通账号只能有限查询）');
   await page.locator('#qrz-user').fill('mock-qrz-user');
   await page.locator('#qrz-pass').fill('mock-qrz-password');
   await page.locator('#save-account-btn').click();
@@ -352,8 +359,12 @@ try {
     const draft = JSON.parse(sessionStorage.getItem('hamlog_session_qso_draft') || 'null');
     return draft?.fields['rst-sent'] === '59' && draft?.fields['rst-rcvd'] === '59';
   });
-  await page.locator('#frequency').fill('144.370');
-  await choose('频段', '选择频段');
+  // 未识别的有效频率仍需手动选择频段，继续验证必填校验。
+  await page.locator('#frequency').fill('999');
+  await page.locator('#band').evaluate(select => {
+    select.value = '';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.locator('#save-btn').click();
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), '频段：选择频段');
   // 两个默认快捷按钮不应在设置缺失时清除用户手填内容。

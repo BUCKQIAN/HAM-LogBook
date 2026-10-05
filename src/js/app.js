@@ -246,6 +246,8 @@ function renderAllowedBandOptions() {
   const placeholder = document.createElement('option');
   placeholder.value = '';
   placeholder.textContent = '选择频段';
+  placeholder.disabled = true;
+  placeholder.selected = true;
   bandSelect.appendChild(placeholder);
 
   for (const band of BAND_CATALOG) {
