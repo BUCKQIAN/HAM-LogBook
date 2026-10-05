@@ -2,7 +2,9 @@
 
 ### 面向中国业余无线电爱好者的 Android 离线通联日志
 
-当前待发布版本：**v1.2.0**，Android 内部版本号 `12`。正式签名安装包与发布说明正在准备，尚未上传 GitHub Release；源码位于 `codex/v1.2.0` 分支。
+当前正式版本：**v1.2.0**，Android 内部版本号 `12`，发布日期为 2026-10-05。稳定源码位于 `main`，版本标签为 `v1.2.0`。
+
+从 [v1.2.0 Release](https://github.com/BUCKQIAN/HAM-LogBook/releases/tag/v1.2.0) 下载正式安装包、对应源码及校验文件；安装前请阅读下方的数据备份与签名说明。
 
 HAM Logbook 用于记录业余无线电通联（QSO）。核心功能可完全离线使用；联网后可选用 HamQTH 或 QRZ 补全对方呼号资料。日志统一使用 UTC，并可导入、导出标准 ADIF 3.1.4 文件，兼容 Logger32、N1MM、Wavelog 等常见日志软件。
 
