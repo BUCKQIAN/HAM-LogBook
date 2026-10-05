@@ -44,18 +44,24 @@ HamQTH 密码仅存放在 Android Keystore 中，不会写入个人信息备份�
 - 自动备份每天最多生成一份，滚动保留最近 7 份。
 - 大型 ADIF 采用流式解析、分批写入和整文件事务；导入失败会回滚。本应用限制单个导入文件最大 256 MB、最多 100 万条记录。
 
-### 升级至 v1.1.0
+### 更换为正式签名安装包
 
-- 请直接覆盖安装，不要先卸载旧版，以保留数据。
-- 首次启动时，旧版本的明文日志数据库会原地迁移至 SQLCipher 加密数据库；日志较多时请耐心等待。
-- 完成迁移后不建议降级到旧版，因为旧版可能无法读取加密后的数据库。
+**原先发布的 v1.0.0 / v1.1.0 安装包，不能被新的正式签名重打包版覆盖安装。请先备份数据，再卸载旧包、安装新包。**
+
+1. 卸载前导出 ADIF 日志；如果旧版支持个人信息备份，请同时保存。确认备份文件已保存在应用之外。
+2. 卸载旧包后安装正式签名重打包版。卸载会删除应用内的日志和设置，不能依靠安装新版自动保留数据。
+3. 安装完成后导入 ADIF，并恢复个人信息备份或手动重新设置台站资料。HamQTH 密码需要重新填写。
+
+两个重打包版沿用原来的版本号，文件名包含 `-release`，并使用同一把正式密钥。同签名版本之间具备覆盖升级的签名条件；v1.0.0 → v1.1.0 的数据库迁移仍需真机验证，升级前请备份，不建议降级。
+
+重打包方法、安装包核验和长期维护流程见 [开发与发布指南](docs/DEVELOPMENT_GUIDE.md)。
 
 ## 🛠️ 技术栈
 
 - **容器框架**：[Capacitor 8.5](https://capacitorjs.com/)
 - **前端**：HTML5、CSS3、Vanilla JavaScript（无框架、无 CDN）
 - **数据库**：SQLite / SQLCipher（[`@capacitor-community/sqlite` 8.1](https://github.com/capacitor-community/sqlite)）
-- **原生平台**：Android，`minSdk 24`（Android 7.0+）、`compileSdk` / `targetSdk` 36
+- **原生平台**：Android，`minSdk 24`（Android 7.0+）、`compileSdk` / `targetSdk 36`
 - **定位**：`navigator.geolocation` Web API
 
 ## 🚀 开发与构建
@@ -65,7 +71,7 @@ HamQTH 密码仅存放在 Android Keystore 中，不会写入个人信息备份�
 | 依赖 | 版本 |
 |---|---|
 | Node.js | 22+ |
-| JDK | 17+ |
+| JDK | 21（插件要求 Java 21 工具链） |
 | Android SDK | Android API 36（并安装相应 Build Tools） |
 
 Android 原生工程已经提交到仓库，首次克隆后**不需要**执行 `npx cap add android`。
@@ -109,6 +115,8 @@ HAMLOG_RELEASE_KEY_PASSWORD
 ```
 
 缺少完整签名配置时，Release 构建会主动失败，避免误发布错误签名的安装包。
+
+已配置正式密钥后，运行 `./gradlew assembleRelease`。历史 v1.0.0 / v1.1.0 的统一签名重打包可在项目根目录运行 `python3 scripts/rebuild-releases.py`，具体环境和输出位置见 [开发与发布指南](docs/DEVELOPMENT_GUIDE.md)。
 
 ## 🔒 Android 权限
 

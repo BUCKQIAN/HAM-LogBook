@@ -1,0 +1,21 @@
+// Optional local fallback for an official artifact whose Java TLS download failed.
+// The directory must contain the original, checksum-verified Google Maven files.
+def fallbackPath = System.getenv('HAMLOG_BUILD_MAVEN_FALLBACK')
+if (!fallbackPath) {
+    throw new GradleException('HAMLOG_BUILD_MAVEN_FALLBACK is required for this init script')
+}
+allprojects {
+    repositories {
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'hamlogVerifiedOfficialArtifact'
+                    url = uri(fallbackPath)
+                }
+            }
+            filter {
+                includeModule('com.android.tools', 'play-sdk-proto')
+            }
+        }
+    }
+}
