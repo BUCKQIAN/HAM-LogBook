@@ -98,11 +98,9 @@ export async function initPage() {
   // 从中继页主动选择的预设应覆盖旧草稿中的频率。
   checkRepeaterPreset();
 
-  // 迁移旧版本保存在 localStorage 的选择，并在网页首帧后关闭真正的原生启动页。
-  void syncNativeSplashStyle(getSplashStyle());
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => void hideNativeSplash());
-  });
+  // 先同步旧版网页设置；原生收到就绪通知后确认 WebView 绘制状态，再退出启动页。
+  await Promise.all([syncNativeSplashStyle(getSplashStyle()), window.hamlogTheme?.syncNative?.()]);
+  void hideNativeSplash();
 
   // 尝试初始化数据库（失败不阻断其他功能）
   try {

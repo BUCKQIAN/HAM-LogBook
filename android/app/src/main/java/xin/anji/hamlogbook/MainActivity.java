@@ -1,97 +1,96 @@
 package xin.anji.hamlogbook;
 
 import android.content.pm.ApplicationInfo;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import androidx.core.splashscreen.SplashScreen;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static final long SPLASH_FALLBACK_MS = 3500L;
     private static final long SYSTEM_SPLASH_READY_FALLBACK_MS = 800L;
-    private static final long MIN_SELECTED_SPLASH_MS = 1000L;
+    private static final long SPLASH_EXIT_MS = 100L;
 
     private NativeSplashView nativeSplashView;
     private Handler splashHandler;
+    private String splashStyle = "A";
+    private String webTheme = "day";
     private boolean systemSplashReady;
-    private boolean splashHideScheduled;
-    private long selectedSplashShownAtMs;
-    private final Runnable splashFallback = this::hideNativeSplash;
+    private boolean splashActive = true;
+    private boolean webContentReady;
+    private boolean visualStatePending;
+    private boolean destroyed;
+    private final Runnable splashFallback = this::releaseSplash;
     private final Runnable systemSplashReadyFallback = () -> systemSplashReady = true;
+    private final Runnable splashTransitionFallback = this::finishSplashTransition;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        String style = NativeSplashPlugin.getSavedStyle(this);
+        splashStyle = NativeSplashPlugin.getSavedStyle(this);
+        webTheme = NativeSplashPlugin.getSavedTheme(this);
+        splashHandler = new Handler(Looper.getMainLooper());
 
-        // 系统先显示启动窗口，NativeSplashView 再保证所有 Android 版本都能看到用户所选方案。
+        // Android 12+ 的系统启动窗口已使用所选方案，不再叠加第二个启动页。
+        boolean useSystemSplash = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+        if (useSystemSplash) setTheme(NativeSplashPlugin.getSystemSplashTheme(splashStyle));
         SplashScreen systemSplash = SplashScreen.installSplashScreen(this);
         systemSplash.setKeepOnScreenCondition(() -> !systemSplashReady);
-        systemSplash.setOnExitAnimationListener(provider ->
-            provider.getView().animate()
-                .alpha(0f)
-                .setDuration(100L)
-                .withEndAction(provider::remove)
-                .start()
-        );
+        systemSplash.setOnExitAnimationListener(provider -> {
+            // Android 12/12L 的兼容库在此回调前会重设系统栏，恢复当前颜色与图标。
+            applyCurrentSystemBars();
+            provider.getView().animate().alpha(0f).setDuration(SPLASH_EXIT_MS)
+                .withEndAction(() -> {
+                    provider.remove();
+                    if (useSystemSplash && webContentReady) finishSplashTransition();
+                    else applyCurrentSystemBars();
+                }).start();
+        });
 
-        // 自定义插件必须在 Bridge 创建前注册。
         registerPlugin(NativeSplashPlugin.class);
         registerPlugin(AdifFileManagerPlugin.class);
         registerPlugin(SecureDataPlugin.class);
         super.onCreate(savedInstanceState);
         hardenWebView();
-        splashHandler = new Handler(Looper.getMainLooper());
+        NativeSplashPlugin.applySystemSplashTheme(this, splashStyle);
 
-        // 修复系统主题记录与本地设置不一致的情况；当前冷启动已显示，下一次生效。
-        NativeSplashPlugin.applySystemSplashTheme(this, style);
-        int background = NativeSplashView.getBackgroundColor(style);
-        configureSystemBars(style, background);
+        if (!useSystemSplash) showLegacySplash();
+        applyCurrentSystemBars();
+        // Capacitor 内置 SystemBars 初始化会排队重设外观，在其完成后再恢复本应用设置。
+        getWindow().getDecorView().post(this::applyCurrentSystemBars);
+        splashHandler.postDelayed(splashFallback, SPLASH_FALLBACK_MS);
+    }
 
-        nativeSplashView = new NativeSplashView(this, style);
-        selectedSplashShownAtMs = SystemClock.uptimeMillis();
+    private void showLegacySplash() {
+        nativeSplashView = new NativeSplashView(this, splashStyle);
         nativeSplashView.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
             @Override
-            public void onLayoutChange(
-                View view,
-                int left,
-                int top,
-                int right,
-                int bottom,
-                int oldLeft,
-                int oldTop,
-                int oldRight,
-                int oldBottom
-            ) {
+            public void onLayoutChange(View view, int left, int top, int right, int bottom,
+                int oldLeft, int oldTop, int oldRight, int oldBottom) {
                 if (right <= left || bottom <= top) return;
                 systemSplashReady = true;
                 view.removeOnLayoutChangeListener(this);
             }
         });
-        addContentView(
-            nativeSplashView,
-            new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        );
+        addContentView(nativeSplashView, new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         nativeSplashView.bringToFront();
-
-        // 网页会在首帧绘制后主动关闭；此超时仅防止异常时遮住应用。
         splashHandler.postDelayed(systemSplashReadyFallback, SYSTEM_SPLASH_READY_FALLBACK_MS);
-        splashHandler.postDelayed(splashFallback, SPLASH_FALLBACK_MS);
     }
 
     private void hardenWebView() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
         WebView webView = getBridge().getWebView();
         WebSettings settings = webView.getSettings();
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
@@ -103,72 +102,101 @@ public class MainActivity extends BridgeActivity {
         WebView.setWebContentsDebuggingEnabled(isDebuggable);
     }
 
+    public void setWebTheme(String theme) {
+        webTheme = "night".equals(theme) ? "night" : "day";
+        // 启动期间保持启动方案的外观，页面显示后才切换到网页主题。
+        applyCurrentSystemBars();
+    }
+
     public void hideNativeSplash() {
         runOnUiThread(() -> {
-            if (splashHandler != null) {
-                splashHandler.removeCallbacks(systemSplashReadyFallback);
-                splashHandler.removeCallbacks(splashFallback);
-            }
-            systemSplashReady = true;
-
-            // 网页很快就绪时仍至少展示一秒用户方案，避免只闪过一帧。
-            if (nativeSplashView != null && splashHandler != null) {
-                long elapsed = SystemClock.uptimeMillis() - selectedSplashShownAtMs;
-                long remaining = MIN_SELECTED_SPLASH_MS - elapsed;
-                if (remaining > 0L) {
-                    if (!splashHideScheduled) {
-                        splashHideScheduled = true;
-                        splashHandler.postDelayed(splashFallback, remaining);
-                    }
-                    return;
-                }
-            }
-            splashHideScheduled = false;
-
-            if (nativeSplashView == null) {
-                restoreSystemBars();
+            if (destroyed || webContentReady || visualStatePending) return;
+            if (getBridge() == null || getBridge().getWebView() == null) {
+                releaseSplash();
                 return;
             }
-
-            NativeSplashView view = nativeSplashView;
-            nativeSplashView = null;
-            view.animate()
-                .alpha(0f)
-                .setDuration(220L)
-                .withEndAction(() -> {
-                    ViewGroup parent = (ViewGroup) view.getParent();
-                    if (parent != null) parent.removeView(view);
-                    restoreSystemBars();
-                })
-                .start();
+            WebView webView = getBridge().getWebView();
+            if (!webView.isAttachedToWindow() || webView.getVisibility() != View.VISIBLE) return;
+            visualStatePending = true;
+            // 确认调用时的 DOM 已可绘制，而不是用固定停留时间推测网页是否就绪。
+            webView.postVisualStateCallback(0L, new WebView.VisualStateCallback() {
+                @Override
+                public void onComplete(long requestId) {
+                    if (!destroyed) releaseSplash();
+                }
+            });
         });
     }
 
-    private void configureSystemBars(String style, int color) {
-        getWindow().setStatusBarColor(color);
-        getWindow().setNavigationBarColor(color);
-        int flags = getWindow().getDecorView().getSystemUiVisibility();
-        boolean light = !"D".equals(style);
-        flags = light ? flags | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            : flags & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            flags = light ? flags | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-                : flags & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+    private void releaseSplash() {
+        if (destroyed || webContentReady) return;
+        webContentReady = true;
+        systemSplashReady = true;
+        splashHandler.removeCallbacks(systemSplashReadyFallback);
+        splashHandler.removeCallbacks(splashFallback);
+        getWindow().getDecorView().invalidate();
+
+        if (nativeSplashView != null) {
+            NativeSplashView view = nativeSplashView;
+            nativeSplashView = null;
+            view.animate().alpha(0f).setDuration(SPLASH_EXIT_MS).withEndAction(() -> {
+                ViewGroup parent = (ViewGroup) view.getParent();
+                if (parent != null) parent.removeView(view);
+                finishSplashTransition();
+            }).start();
+        } else {
+            // 某些热恢复/启动来源不展示系统启动页，也就不会触发退出监听。
+            splashHandler.postDelayed(splashTransitionFallback, SPLASH_EXIT_MS + 150L);
         }
-        getWindow().getDecorView().setSystemUiVisibility(flags);
     }
 
-    private void restoreSystemBars() {
-        int paper = Color.rgb(243, 239, 232);
-        configureSystemBars("A", paper);
+    private void finishSplashTransition() {
+        if (destroyed) return;
+        splashHandler.removeCallbacks(splashTransitionFallback);
+        splashActive = false;
+        applyCurrentSystemBars();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applyCurrentSystemBars() {
+        if (destroyed) return;
+        boolean dark = splashActive ? "D".equals(splashStyle) : "night".equals(webTheme);
+        int background = splashActive ? NativeSplashView.getBackgroundColor(splashStyle)
+            : dark ? Color.rgb(36, 33, 31) : Color.rgb(243, 239, 232);
+        getWindow().setStatusBarColor(background);
+        getWindow().setNavigationBarColor(background);
+        // Android 15+ 系统栏透明，必须同时提供栏后面的窗口背景。
+        getWindow().getDecorView().setBackgroundColor(background);
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().setBackgroundColor("night".equals(webTheme)
+                ? Color.rgb(36, 33, 31) : Color.rgb(243, 239, 232));
+        }
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
+            getWindow(), getWindow().getDecorView());
+        controller.setAppearanceLightStatusBars(!dark);
+        controller.setAppearanceLightNavigationBars(!dark);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        webTheme = NativeSplashPlugin.getSavedTheme(this);
+        applyCurrentSystemBars();
+        getWindow().getDecorView().post(this::applyCurrentSystemBars);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        webTheme = NativeSplashPlugin.getSavedTheme(this);
+        applyCurrentSystemBars();
+        getWindow().getDecorView().post(this::applyCurrentSystemBars);
     }
 
     @Override
     public void onDestroy() {
-        if (splashHandler != null) {
-            splashHandler.removeCallbacks(systemSplashReadyFallback);
-            splashHandler.removeCallbacks(splashFallback);
-        }
+        destroyed = true;
+        if (splashHandler != null) splashHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
 }

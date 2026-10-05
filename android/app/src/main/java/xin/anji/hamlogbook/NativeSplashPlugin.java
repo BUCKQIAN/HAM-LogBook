@@ -2,6 +2,7 @@ package xin.anji.hamlogbook;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Build;
 
 import com.getcapacitor.JSObject;
@@ -16,6 +17,15 @@ import java.util.Locale;
 public class NativeSplashPlugin extends Plugin {
     private static final String PREFS_NAME = "hamlog_native_settings";
     private static final String STYLE_KEY = "startup_splash_style";
+    private static final String THEME_KEY = "app_theme_preference";
+
+    static String getSavedTheme(Context context) {
+        String preference = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(THEME_KEY, "system");
+        if ("day".equals(preference) || "night".equals(preference)) return preference;
+        int mode = context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return mode == Configuration.UI_MODE_NIGHT_YES ? "night" : "day";
+    }
 
     static String getSavedStyle(Context context) {
         String value = context
@@ -60,13 +70,34 @@ public class NativeSplashPlugin extends Plugin {
             return;
         }
 
-        boolean systemThemeApplied = applySystemSplashTheme(getActivity(), style);
+        getActivity().runOnUiThread(() -> {
+            boolean systemThemeApplied = applySystemSplashTheme(getActivity(), style);
+            JSObject result = new JSObject();
+            result.put("style", style);
+            result.put("systemThemeApplied", systemThemeApplied);
+            result.put("takesEffectNextColdStart", true);
+            call.resolve(result);
+        });
+    }
 
-        JSObject result = new JSObject();
-        result.put("style", style);
-        result.put("systemThemeApplied", systemThemeApplied);
-        result.put("takesEffectNextColdStart", true);
-        call.resolve(result);
+    @PluginMethod
+    public void setTheme(PluginCall call) {
+        String theme = "night".equals(call.getString("theme")) ? "night" : "day";
+        String requested = call.getString("preference", theme);
+        String preference = "day".equals(requested) || "night".equals(requested) ? requested : "system";
+        android.content.SharedPreferences preferences = getContext()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        if (!preference.equals(preferences.getString(THEME_KEY, "system"))
+            && !preferences.edit().putString(THEME_KEY, preference).commit()) {
+            call.reject("无法保存外观设置");
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).setWebTheme(theme);
+            }
+            call.resolve();
+        });
     }
 
     @PluginMethod

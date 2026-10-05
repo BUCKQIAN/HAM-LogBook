@@ -29,11 +29,22 @@ try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await context.addInitScript(() => {
     window._dbReady = true;
+    const recordNative = event => {
+      const events = JSON.parse(sessionStorage.getItem('mock-native-events') || '[]');
+      events.push(event);
+      sessionStorage.setItem('mock-native-events', JSON.stringify(events));
+    };
     const readRepeaters = () => JSON.parse(localStorage.getItem('mock-repeaters'));
     if (!localStorage.getItem('mock-repeaters')) localStorage.setItem('mock-repeaters', JSON.stringify([
       { id: 1, name: '测试中继', rx_frequency: 439.65, tx_frequency: 434.65, tx_tone: 'T88.5', rx_tone: '', location: '原位置', notes: '原备注', created_at: 1 }
     ]));
-    window.Capacitor = { isNativePlatform: () => false, Plugins: { CapacitorSQLite: {
+    window.Capacitor = { isNativePlatform: () => false, Plugins: {
+      NativeSplash: {
+        setTheme: async value => { recordNative({ type: 'theme', ...value }); },
+        setStyle: async value => { recordNative({ type: 'style', ...value }); return { systemThemeApplied: true }; },
+        hide: async () => { recordNative({ type: 'ready' }); }
+      },
+      CapacitorSQLite: {
       createConnection: async () => ({}),
       query: async ({ statement }) => ({ values: /FROM repeaters/i.test(statement)
         ? readRepeaters() : /COUNT\(/i.test(statement) ? [{ count: 0 }] : [] }),
@@ -68,13 +79,79 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   const go = async url => {
     await page.goto(url);
-    await page.waitForFunction(() => document.documentElement.dataset.pageReady === 'true');
+    await page.waitForFunction(() => document.documentElement.dataset.pageReady === 'true'
+      || (document.body.dataset.settingsPage === 'home' && document.querySelector('.bottom-nav') && window.hamlogTheme));
   };
   const choose = async (label, value) => {
     await page.getByRole('button', { name: new RegExp(`^${label}：`) }).click();
     await page.getByRole('dialog').getByRole('button', { name: value, exact: true }).click();
   };
+  // 设置主页不滚动；屏幕过矮时只允许导航之间的内容内部滚动。
+  for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }, { width: 320, height: 320 }]) {
+    await page.setViewportSize(viewport);
+    await go(`${base}/settings.html`);
+    const sizes = await page.evaluate(() => {
+      const content = document.querySelector('.content');
+      return { root: document.documentElement.clientHeight, scroll: document.documentElement.scrollHeight,
+        content: content.clientHeight, contentScroll: content.scrollHeight,
+        bottom: content.getBoundingClientRect().bottom, nav: document.querySelector('.bottom-nav').getBoundingClientRect().top };
+    });
+    assert.equal(sizes.root, sizes.scroll);
+    assert.ok(Math.abs(sizes.bottom - sizes.nav) < 1);
+    await page.evaluate(() => window.scrollTo(0, 500));
+    assert.equal(await page.evaluate(() => scrollY), 0);
+    if (viewport.height === 844) assert.equal(sizes.content, sizes.contentScroll);
+    else if (sizes.contentScroll > sizes.content) {
+      await page.evaluate(() => document.querySelector('.content').scrollTo(0, 10000));
+      const box = await page.getByRole('link', { name: 'https://github.com/BUCKQIAN/HAM-LogBook' }).boundingBox();
+      assert.ok(box.y + box.height <= sizes.nav);
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await go(`${base}/settings.html`);
+  await page.evaluate(async () => { window.hamlogTheme.set('night'); await window.hamlogTheme.syncNative(); });
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'night');
+  assert.deepEqual(await page.evaluate(() => JSON.parse(sessionStorage.getItem('mock-native-events')).at(-1)),
+    { type: 'theme', theme: 'night', preference: 'night' });
+  await page.waitForFunction(() => getComputedStyle(document.body).backgroundColor === 'rgb(36, 33, 31)');
+  await page.screenshot({ path: `${output}/settings-home-night.png` });
+  await page.evaluate(() => {
+    for (const [side, value] of Object.entries({ top: '24px', bottom: '24px', left: '12px', right: '12px' })) {
+      document.documentElement.style.setProperty(`--safe-area-inset-${side}`, value);
+    }
+  });
+  const safeLayout = await page.evaluate(() => {
+    const content = document.querySelector('.content').getBoundingClientRect();
+    const nav = document.querySelector('.bottom-nav').getBoundingClientRect();
+    const header = document.querySelector('.top-bar').getBoundingClientRect();
+    return { rootScroll: document.documentElement.scrollHeight, height: innerHeight,
+      headerHeight: header.height, contentTop: content.top, contentBottom: content.bottom, navTop: nav.top,
+      toggleTop: document.querySelector('.theme-toggle').getBoundingClientRect().top,
+      linksBottom: Math.max(...[...document.querySelectorAll('.bottom-nav a')].map(link => link.getBoundingClientRect().bottom)) };
+  });
+  assert.equal(safeLayout.rootScroll, safeLayout.height);
+  assert.equal(safeLayout.headerHeight, 86);
+  assert.equal(safeLayout.contentTop, safeLayout.headerHeight);
+  assert.equal(safeLayout.contentBottom, safeLayout.navTop);
+  assert.ok(safeLayout.toggleTop >= 24);
+  assert.ok(safeLayout.linksBottom <= safeLayout.height - 24);
+  await page.evaluate(() => {
+    for (const side of ['top', 'bottom', 'left', 'right']) document.documentElement.style.removeProperty(`--safe-area-inset-${side}`);
+  });
+  await go(`${base}/settings-splash.html`);
+  await page.getByText('方案 D', { exact: true }).click();
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes('方案 D 已保存'));
+  assert.equal(await page.evaluate(() => localStorage.getItem('hamlog_splash_style')), 'D');
+  await page.evaluate(async () => { window.hamlogTheme.set('day'); await window.hamlogTheme.syncNative(); });
+  await go(`${base}/index.html`);
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'day');
+  const launchEvents = await page.evaluate(() => JSON.parse(sessionStorage.getItem('mock-native-events')));
+  const readyIndex = launchEvents.findLastIndex(event => event.type === 'ready');
+  assert.ok(readyIndex > launchEvents.findLastIndex(event => event.type === 'style'));
+  assert.ok(readyIndex > launchEvents.findLastIndex(event => event.type === 'theme'));
+  assert.equal(launchEvents.filter(event => event.type === 'style').at(-1).style, 'D');
   await go(`${base}/settings-station.html`);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), true);
   await page.locator('#my-rigs-input').fill('FT-60\nIC-705');
   await page.locator('#save-rigs-btn').click();
   await page.locator('#default-rig').fill('FT-60');
@@ -280,7 +357,7 @@ try {
     if (width !== 768) await page.locator('.card').nth(1).screenshot({ path: `${output}/signal-shortcuts-${width}.png` });
   }
   assert.deepEqual(errors, []);
-  console.log('浏览器回归通过：默认值、优秀信号填入 59、中继编辑/取消/校验/应用/删除/新建、三轮跨页选择、返回后预设刷新、HamQTH/QRZ 登录重试和填充、旧查询结果丢弃、320/390/768px 三按钮等宽布局。');
+  console.log('浏览器回归通过：设置主页固定布局与小屏可访问性、主题/启动样式同步和就绪顺序、默认值和优秀信号、中继编辑与应用、三轮跨页选择、HamQTH/QRZ 模拟查询、320/390/768px 布局。');
 } catch (error) {
   if (activePage) {
     console.error(await activePage.evaluate(() => ({

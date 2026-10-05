@@ -28,6 +28,13 @@
   --shadow-raised: 0 16px 42px rgba(76, 55, 34, .14);
   --header-height: 62px;
   --nav-height: 64px;
+  /* Capacitor 会为部分 WebView 提供变量；其他环境沿用浏览器的安全区。 */
+  --app-safe-area-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --app-safe-area-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --app-safe-area-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --app-safe-area-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --header-total-height: calc(var(--header-height) + var(--app-safe-area-top));
+  --nav-total-height: calc(var(--nav-height) + var(--app-safe-area-bottom));
   --radius-card: 5px;
   --radius-control: 8px;
   --radius-button: 9px;
@@ -114,11 +121,11 @@ input[type="file"] { height: auto; padding: 8px; }
   position: fixed;
   inset: 0 0 auto 0;
   z-index: 100;
-  height: var(--header-height);
+  height: var(--header-total-height);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 54px 7px 18px;
+  padding: calc(7px + var(--app-safe-area-top)) calc(54px + var(--app-safe-area-right)) 7px calc(18px + var(--app-safe-area-left));
   background: var(--chrome-bg);
   border-bottom: 1px solid var(--paper-border);
   backdrop-filter: blur(12px);
@@ -146,9 +153,10 @@ input[type="file"] { height: auto; padding: 8px; }
 
 .theme-toggle {
   position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: calc(14px + var(--app-safe-area-right));
+  top: var(--app-safe-area-top);
+  bottom: 0;
+  margin-block: auto;
   width: 34px;
   height: 34px;
   border: 1px solid var(--paper-border);
@@ -162,8 +170,8 @@ input[type="file"] { height: auto; padding: 8px; }
 
 .content {
   width: min(100%, 720px);
-  margin: var(--header-height) auto calc(var(--nav-height) + 18px);
-  padding: 16px 12px 20px;
+  margin: var(--header-total-height) auto calc(var(--nav-total-height) + 18px);
+  padding: 16px calc(12px + var(--app-safe-area-right)) 20px calc(12px + var(--app-safe-area-left));
 }
 
 .card {
@@ -300,7 +308,7 @@ input[type="file"] { height: auto; padding: 8px; }
 .btn-wide { width: 100%; }
 .signal-shortcuts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
 .signal-shortcuts .btn-small { min-width: 0; padding-inline: 4px; }
-#repeater-form { scroll-margin-top: calc(var(--header-height) + 12px); }
+#repeater-form { scroll-margin-top: calc(var(--header-total-height) + 12px); }
 .search-actions { justify-content: flex-end; }
 
 .folder-picker-row { display: flex; align-items: stretch; gap: 8px; }
@@ -445,10 +453,10 @@ input[type="file"] { height: auto; padding: 8px; }
   position: fixed;
   inset: auto 0 0 0;
   z-index: 100;
-  height: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  height: var(--nav-total-height);
   display: flex;
   align-items: stretch;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 0 var(--app-safe-area-right) var(--app-safe-area-bottom) var(--app-safe-area-left);
   background: var(--nav-bg);
   border-top: 1px solid var(--paper-border);
   box-shadow: 0 -8px 24px rgba(76, 55, 34, .06);
@@ -478,7 +486,7 @@ input[type="file"] { height: auto; padding: 8px; }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--nav-height) + 22px);
+  bottom: calc(var(--nav-total-height) + 22px);
   z-index: 9999;
   max-width: calc(100% - 36px);
   transform: translateX(-50%);
@@ -571,6 +579,29 @@ input[type="file"] { height: auto; padding: 8px; }
 .settings-menu-item small { display: block; color: var(--ink-soft); font-size: 10px; line-height: 1.5; }
 .settings-menu-arrow { flex: 0 0 auto; color: var(--accent); font-family: Georgia, serif; font-size: 26px; line-height: 1; }
 .settings-about-section { margin-top: 4px; }
+.settings-home {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body[data-settings-page="home"] {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+/* 设置主页固定在导航之间；只有小屏或大字体使内容放不下时，内容区才滚动。 */
+body[data-settings-page="home"] > .content {
+  flex: 1;
+  min-height: 0;
+  margin: var(--header-total-height) auto var(--nav-total-height);
+  overflow-y: auto;
+  overscroll-behavior: none;
+}
 .settings-back-link { display: inline-flex; align-items: center; margin: 0 2px 14px; color: var(--accent); font-size: 12px; text-decoration: none; }
 .settings-back-link:active { opacity: .7; }
 
@@ -659,7 +690,7 @@ body.modal-open { overflow: hidden; }
 .splash-style-option__preview--e .splash-style-option__mark { border-radius: 0; border-color: #a75d46; color: #a75d46; }
 
 @media (max-width: 520px) {
-  .content { padding: 13px 10px 18px; }
+  .content { padding: 13px calc(10px + var(--app-safe-area-right)) 18px calc(10px + var(--app-safe-area-left)); }
   .card-content { padding: 12px; }
   .field-row { gap: 6px; }
   .field-row .field { min-width: 0; }

@@ -1,6 +1,6 @@
 /* ============================================================
    splash.js - Android 原生启动页设置桥接
-   设置页保留五种预览；系统启动窗口之后由 NativeSplashView 保证显示用户所选方案。
+   Android 12+ 使用单层系统启动页；较旧系统使用 NativeSplashView 兼容显示。
    ============================================================ */
 
 export const SPLASH_STYLE_KEY = 'hamlog_splash_style';
@@ -53,7 +53,7 @@ export async function setSplashStyle(style) {
   return syncNativeSplashStyle(normalized);
 }
 
-/** 首页首帧就绪后关闭用户所选的 Android 原生覆盖层；浏览器预览时自动跳过。 */
+/** 通知原生网页已初始化；原生确认绘制状态后关闭启动页，浏览器预览时跳过。 */
 export async function hideNativeSplash() {
   const plugin = getNativeSplashPlugin();
   if (!plugin?.hide) return;
