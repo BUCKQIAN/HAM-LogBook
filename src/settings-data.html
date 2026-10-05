@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com https://xmldata.qrz.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
   <title>HAM Logbook - 数据管理</title>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/theme.js"></script>
@@ -21,10 +21,18 @@
     <a class="settings-back-link" href="settings.html">‹ 返回设置</a>
 
     <div class="settings-section">
-      <h3>呼号查询源（HamQTH）</h3>
+      <h3>呼号查询源</h3>
       <div class="card">
         <div class="card-content">
           <p class="helper-text">可选配置。未填写账号时仍可正常离线保存 QSO，仅停用联网呼号查询。</p>
+          <div class="field">
+            <label for="callbook-provider">查询源</label>
+            <select id="callbook-provider">
+              <option value="hamqth">HamQTH（免费注册）</option>
+              <option value="qrz">QRZ（普通账号可尝试有限查询）</option>
+            </select>
+          </div>
+          <div id="hamqth-account-fields">
           <div class="field">
             <label for="hamqth-user">用户名</label>
             <input type="text" id="hamqth-user" placeholder="HamQTH 用户名" autocomplete="off">
@@ -33,7 +41,20 @@
             <label for="hamqth-pass">密码</label>
             <input type="password" id="hamqth-pass" placeholder="HamQTH 密码" autocomplete="off">
           </div>
+          </div>
+          <div id="qrz-account-fields" hidden>
+            <div class="field">
+              <label for="qrz-user">QRZ 用户名</label>
+              <input type="text" id="qrz-user" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="qrz-pass">QRZ 密码</label>
+              <input type="password" id="qrz-pass" autocomplete="off">
+            </div>
+            <p class="helper-text">普通 QRZ 账号可尝试有限资料查询，实际返回字段以服务为准；完整查询需要 XML 订阅。</p>
+          </div>
           <button class="btn-small btn-apply" id="save-account-btn">💾 保存账号</button>
+          <button class="btn-small" type="button" id="test-account-btn">验证已保存的账号</button>
         </div>
       </div>
     </div>
@@ -75,7 +96,7 @@
           </div>
           <button class="btn btn-secondary" id="share-adif-btn">📲 分享日志</button>
           <div class="data-subsection">
-            <p class="helper-text"><strong>个人信息迁移</strong><br>备份中继台、台站呼号、操作证类别、默认 QTH、HamQTH 用户名和设备预设，不包含 QSO 日志。为防止凭据泄露，密码不会写入备份，迁移后需要重新填写。</p>
+            <p class="helper-text"><strong>个人信息迁移</strong><br>备份中继台、台站呼号、操作证类别、默认 QTH、默认频率、设备和功率、查询源及用户名和设备列表，不包含 QSO 日志。密码不会写入备份，迁移后需要重新填写。</p>
             <label class="checkbox-label" for="encrypt-personal-info">
               <input type="checkbox" id="encrypt-personal-info" checked>
               使用备份密码加密个人信息文件（推荐）

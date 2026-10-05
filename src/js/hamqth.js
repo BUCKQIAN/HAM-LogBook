@@ -6,56 +6,13 @@
    - 自动重试 Session 过期
    ============================================================ */
 
-import { latLngToLocator, isValidLocator, normalizeLocator } from './locator.js';
+import { requestCallbookXml } from './callbook-http.js';
+import { parseCallbookXml, xmlNode, xmlText, normalizeCallbookLocation } from './callbook-data.js';
 import { loadHamQthCredentials } from './secure-data.js';
 
 const HAMQTH_BASE = 'https://www.hamqth.com/xml.php';
 const SESSION_KEY = 'hamlog_hamqth_session';
 const SESSION_TTL = 3600000; // 1 小时（毫秒）
-const REQUEST_TIMEOUT = 10000; // 10 秒
-
-/**
- * 带超时的 fetch 封装
- * @param {string} url
- * @param {number} timeoutMs
- * @returns {Promise<Response>}
- */
-async function fetchWithTimeout(url, timeoutMs = REQUEST_TIMEOUT) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      cache: 'no-store',
-      credentials: 'omit',
-      referrerPolicy: 'no-referrer'
-    });
-    if (!response.ok) throw new Error(`HamQTH 服务返回 HTTP ${response.status}`);
-    return response;
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('查询超时，请检查网络连接');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
- * 解析 HamQTH XML 响应
- * @param {string} xmlText
- * @returns {Document} 解析后的 XML Document
- */
-function parseXml(xmlText) {
-  const parser = new DOMParser();
-  const document = parser.parseFromString(xmlText, 'text/xml');
-  if (document.querySelector('parsererror')) {
-    throw new Error('HamQTH 返回了无法解析的数据');
-  }
-  return document;
-}
-
 /**
  * 从 XML 节点中读取第一个非空标签值。
  * HamQTH XML 使用默认命名空间；getElementsByTagNameNS 作为兼容兜底。
@@ -111,7 +68,7 @@ export function classifyHamQthError(errorText) {
       clearSession: true
     };
   }
-  if (/session does not exist/i.test(message)) {
+  if (/session.*(?:does not exist|expired|invalid)/i.test(message)) {
     return { error: message, sessionExpired: true, clearSession: true };
   }
   return {
@@ -192,9 +149,7 @@ async function hamqthLogin() {
   }
 
   const url = buildHamQthLoginUrl(username, password);
-  const response = await fetchWithTimeout(url);
-  const xmlText = await response.text();
-  const doc = parseXml(xmlText);
+  const doc = parseCallbookXml(await requestCallbookXml(url, { service: 'HamQTH' }), 'HamQTH');
 
   // 检查登录错误
   const errorInfo = getXmlError(doc);
@@ -219,9 +174,7 @@ async function hamqthLogin() {
  */
 async function hamqthQuery(sessionId, callsign) {
   const url = `${HAMQTH_BASE}?id=${encodeURIComponent(sessionId)}&callsign=${encodeURIComponent(callsign.toUpperCase())}&prg=hamlogbook`;
-  const response = await fetchWithTimeout(url);
-  const xmlText = await response.text();
-  const doc = parseXml(xmlText);
+  const doc = parseCallbookXml(await requestCallbookXml(url, { service: 'HamQTH' }), 'HamQTH');
 
   // 检查 Session 过期
   const errorInfo = getXmlError(doc);
@@ -233,65 +186,23 @@ async function hamqthQuery(sessionId, callsign) {
     throw new Error(errorInfo.error);
   }
 
-  // 检查是否有搜索结果
-  const searchNode = doc.querySelector('search');
-  if (!searchNode) {
-    throw new Error('未找到该呼号信息');
-  }
+  return readHamQthCallsignInfo(doc);
+}
 
-  // 提取字段
-  const callsignResult = searchNode.querySelector('callsign')?.textContent || '';
-  if (!callsignResult) {
-    throw new Error('未找到该呼号信息');
-  }
-
-  // 姓名：优先 nick，其次 name
-  const name = searchNode.querySelector('nick')?.textContent?.trim()
-            || searchNode.querySelector('name')?.textContent?.trim()
-            || '';
-
-  // QTH/位置：优先 qth，其次 adr_city + adr_country
-  const qthDirect = searchNode.querySelector('qth')?.textContent?.trim() || '';
-  let qth = qthDirect;
-  if (!qth) {
-    const city = searchNode.querySelector('adr_city')?.textContent?.trim() || '';
-    const country = searchNode.querySelector('adr_country')?.textContent?.trim() || '';
-    qth = [city, country].filter(Boolean).join(', ');
-  }
-
-  // 经纬度和网格
-  const latStr = searchNode.querySelector('latitude')?.textContent;
-  const lonStr = searchNode.querySelector('longitude')?.textContent;
-  const rawGrid = searchNode.querySelector('grid')?.textContent?.trim() || '';
-
-  let lat = null;
-  let lon = null;
-  let grid = '';
-
-  if (latStr && lonStr) {
-    lat = parseFloat(latStr);
-    lon = parseFloat(lonStr);
-    if (!isNaN(lat) && !isNaN(lon)) {
-      // 优先用经纬度计算 6 位网格（最精确）
-      grid = latLngToLocator(lat, lon);
-    }
-  }
-
-  // 如果没有经纬度，用 API 返回的 grid
-  if (!grid && rawGrid) {
-    const normalizedGrid = normalizeLocator(rawGrid);
-    // 异常的 5 位或超长值不应自动写入表单，否则会阻止用户保存 QSO。
-    if (isValidLocator(normalizedGrid)) grid = normalizedGrid;
-  }
-
+export function readHamQthCallsignInfo(doc) {
+  const search = xmlNode(doc, 'search');
+  if (!search || !xmlText(search, 'callsign')) throw new Error('未找到该呼号信息');
   return {
-    callsign: callsignResult,
-    name: name,
-    qth: qth,
-    lat: lat,
-    lon: lon,
-    grid: grid
+    name: xmlText(search, 'nick') || xmlText(search, 'name') || xmlText(search, 'adr_name'),
+    qth: xmlText(search, 'qth') || [xmlText(search, 'adr_city'), xmlText(search, 'adr_country')].filter(Boolean).join(', '),
+    ...normalizeCallbookLocation(xmlText(search, 'latitude'), xmlText(search, 'longitude'), xmlText(search, 'grid'))
   };
+}
+
+export async function testHamQthConnection() {
+  clearSessionCache();
+  await hamqthLogin();
+  return 'HamQTH 登录验证成功';
 }
 
 /**

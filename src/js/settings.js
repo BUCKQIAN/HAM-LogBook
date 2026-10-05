@@ -28,7 +28,7 @@ import {
   isValidCnOperatorClass,
   storeCnOperatorClass
 } from './operator-license.js';
-import { loadHamQthCredentials, saveHamQthCredentials } from './secure-data.js';
+import { loadHamQthCredentials, saveHamQthCredentials, loadQrzCredentials, saveQrzCredentials } from './secure-data.js';
 import {
   isAutomaticBackupEnabled,
   maybeCreateAutomaticBackup,
@@ -39,10 +39,13 @@ import {
   encryptPersonalInfoBackup,
   isEncryptedPersonalInfoBackup
 } from './backup-crypto.js';
+import { QSO_DEFAULTS_KEY, normalizeQsoDefaults, readQsoDefaults } from './station-presets.js';
+import { refreshFieldPickers } from './field-picker.js';
+import { CALLBOOK_PROVIDER_KEY, getCallbookProvider, testCallbookConnection } from './callbook.js';
 
 const APP_VERSION = '1.2.0';
 const PERSONAL_INFO_FORMAT = 'hamlogbook-personal-info';
-const PERSONAL_INFO_SCHEMA_VERSION = 3;
+const PERSONAL_INFO_SCHEMA_VERSION = 4;
 const HAMQTH_USER_HINT_KEY = 'hamlog_hamqth_user_hint';
 const MAX_PERSONAL_INFO_FILE_SIZE = 2 * 1024 * 1024;
 const MAX_ADIF_FILE_SIZE = 256 * 1024 * 1024;
@@ -55,8 +58,8 @@ let activeDataOperation = '';
 // ========== 页面初始化 ==========
 
 export async function initPage() {
-  await loadSettings();
   bindEvents();
+  await loadSettings();
   setupSplashStyle();
   const dataPage = document.body.dataset.settingsPage === 'data';
   if (!dataPage) return;
@@ -97,7 +100,7 @@ async function loadSettings() {
     'hamqth-user',
     'hamqth-pass',
     'station-callsign',
-    'my-rigs-input'
+    'my-rigs-input', 'default-frequency', 'default-rig', 'default-power', 'qrz-user', 'qrz-pass'
   ].forEach(id => {
     const element = document.getElementById(id);
     if (element) element.value = '';
@@ -126,6 +129,15 @@ async function loadSettings() {
   const pass = credentials.password;
   if (user) setElementValue('hamqth-user', user);
   if (pass) setElementValue('hamqth-pass', pass);
+  if (document.getElementById('callbook-provider')) {
+    setElementValue('callbook-provider', getCallbookProvider());
+    try {
+      const qrz = await loadQrzCredentials();
+      setElementValue('qrz-user', qrz.username || localStorage.getItem('hamlog_qrz_user_hint'));
+      setElementValue('qrz-pass', qrz.password);
+    } catch { window.showToast('读取 QRZ 安全凭据失败，请重新保存账号'); }
+    showCallbookFields();
+  }
 
   const stationCallsign = localStorage.getItem('hamlog_station_callsign');
   if (stationCallsign) setElementValue('station-callsign', stationCallsign);
@@ -135,6 +147,10 @@ async function loadSettings() {
   if (autoBackupInput) autoBackupInput.checked = isAutomaticBackupEnabled();
 
   // 我的设备预设
+  const defaults = readQsoDefaults();
+  setElementValue('default-frequency', defaults.frequency);
+  setElementValue('default-rig', defaults.rig);
+  setElementValue('default-power', defaults.power);
   const rigsStr = localStorage.getItem('hamlog_my_rigs');
   if (rigsStr) {
     try {
@@ -144,6 +160,31 @@ async function loadSettings() {
       }
     } catch (e) { /* ignore */ }
   }
+  refreshRigChoices();
+  refreshFieldPickers();
+}
+
+function refreshRigChoices() {
+  const list = document.getElementById('default-rigs-list');
+  if (!list) return;
+  list.replaceChildren();
+  for (const rig of normalizeRigPresets(readStoredJson('hamlog_my_rigs', []))) {
+    const option = document.createElement('option');
+    option.value = rig;
+    list.appendChild(option);
+  }
+}
+
+function saveQsoDefaults() {
+  try {
+    const defaults = normalizeQsoDefaults({
+      frequency: document.getElementById('default-frequency').value,
+      rig: document.getElementById('default-rig').value,
+      power: document.getElementById('default-power').value
+    });
+    localStorage.setItem(QSO_DEFAULTS_KEY, JSON.stringify(defaults));
+    window.showToast('通联默认值已保存');
+  } catch (error) { window.showToast(error.message); }
 }
 
 function setElementValue(id, value) {
@@ -154,6 +195,9 @@ function setElementValue(id, value) {
 // ========== 事件绑定 ==========
 
 function bindEvents() {
+  document.getElementById('callbook-provider')?.addEventListener('change', showCallbookFields);
+  document.getElementById('test-account-btn')?.addEventListener('click', handleTestCallbook);
+  document.getElementById('save-qso-defaults-btn')?.addEventListener('click', saveQsoDefaults);
   document.getElementById('save-station-btn')?.addEventListener('click', saveStationProfile);
   // 保存默认位置
   const saveQthBtn = document.getElementById('save-qth-btn');
@@ -327,6 +371,7 @@ function saveRigPresets() {
   const rigs = text ? [...new Set(text.split('\n').map(s => s.trim()).filter(Boolean))].slice(0, 30) : [];
   document.getElementById('my-rigs-input').value = rigs.join('\n');
   localStorage.setItem('hamlog_my_rigs', JSON.stringify(rigs));
+  refreshRigChoices();
   window.showToast('设备列表已保存（共 ' + rigs.length + ' 台）');
 }
 
@@ -334,22 +379,44 @@ function saveRigPresets() {
 
 async function saveHamQTHCredentials() {
   const button = document.getElementById('save-account-btn');
-  const username = document.getElementById('hamqth-user').value.trim();
-  const password = document.getElementById('hamqth-pass').value;
+  const provider = document.getElementById('callbook-provider')?.value || 'hamqth';
+  const username = document.getElementById(`${provider}-user`).value.trim();
+  const password = document.getElementById(`${provider}-pass`).value;
   if ((username && !password) || (!username && password)) {
     window.showToast('用户名和密码需要同时填写；两项都留空可清除账号');
     return;
   }
   if (button) button.disabled = true;
   try {
-    await saveHamQthCredentials(username, password);
+    if (provider === 'qrz') await saveQrzCredentials(username, password);
+    else await saveHamQthCredentials(username, password);
+    localStorage.setItem(CALLBOOK_PROVIDER_KEY, provider);
     sessionStorage.removeItem('hamlog_hamqth_session');
-    window.showToast(username && password ? 'HamQTH 账号已加密保存' : 'HamQTH 账号已清除；离线记录不受影响');
+    window.showToast(username && password ? '查询源和账号已安全保存' : '查询源已保存，账号已清除；离线记录不受影响');
   } catch (error) {
-    window.showToast('安全保存 HamQTH 账号失败：' + (error.message || String(error)));
+    window.showToast('安全保存查询账号失败：' + (error.message || String(error)));
   } finally {
     if (button) button.disabled = false;
   }
+}
+
+function showCallbookFields() {
+  const qrz = document.getElementById('callbook-provider')?.value === 'qrz';
+  document.getElementById('hamqth-account-fields').hidden = qrz;
+  document.getElementById('qrz-account-fields').hidden = !qrz;
+  refreshFieldPickers();
+}
+
+async function handleTestCallbook() {
+  const button = document.getElementById('test-account-btn');
+  if (button.disabled) return;
+  if (!navigator.onLine) { window.showToast('当前离线，无法验证账号'); return; }
+  button.disabled = true;
+  try {
+    const provider = document.getElementById('callbook-provider').value;
+    window.showToast(await testCallbookConnection(provider), 4000);
+  } catch (error) { window.showToast(error.message, 4000); }
+  finally { button.disabled = false; }
 }
 
 function saveStationProfile() {
@@ -371,9 +438,9 @@ async function handleExportPersonalInfo() {
 
   try {
     await ensureDatabase();
-    const [repeaters, credentials] = await Promise.all([
+    const [repeaters, credentials, qrzCredentials] = await Promise.all([
       getAllRepeaters(),
-      loadHamQthCredentials()
+      loadHamQthCredentials(), loadQrzCredentials()
     ]);
     const hamqthUsername = credentials.username || localStorage.getItem(HAMQTH_USER_HINT_KEY) || '';
     const backup = {
@@ -387,6 +454,9 @@ async function handleExportPersonalInfo() {
         class: getStoredCnOperatorClass()
       },
       default_qth: readStoredJson('hamlog_default_qth', null),
+      qso_defaults: readQsoDefaults(),
+      callbook_provider: getCallbookProvider(),
+      qrz: { username: qrzCredentials.username || localStorage.getItem('hamlog_qrz_user_hint') || '', credentials_included: false },
       hamqth: {
         username: hamqthUsername,
         credentials_included: false
@@ -474,7 +544,7 @@ async function handleRestorePersonalInfo(event) {
     await loadSettings();
     const credentialMessage = backup.hamqth.password
       ? '，旧备份中的 HamQTH 密码已迁移到安全存储'
-      : '；HamQTH 密码未包含在备份中，请重新填写';
+      : '；查询账号密码未包含在备份中，请重新填写';
     window.showToast(
       `个人信息恢复完成：已恢复 ${backup.repeaters.length} 条中继台和 ${backup.rig_presets.length} 个设备预设${credentialMessage}`,
       6000
@@ -495,7 +565,7 @@ export function normalizePersonalInfoBackup(value) {
     throw new Error('文件类型不匹配，请选择本应用生成的个人信息备份');
   }
   const schemaVersion = Number(value.schema_version);
-  if (![1, 2, PERSONAL_INFO_SCHEMA_VERSION].includes(schemaVersion)) {
+  if (![1, 2, 3, PERSONAL_INFO_SCHEMA_VERSION].includes(schemaVersion)) {
     throw new Error(`不支持的备份版本：${value.schema_version ?? '未知'}`);
   }
   if (!Array.isArray(value.rig_presets) || !Array.isArray(value.repeaters)) {
@@ -514,9 +584,12 @@ export function normalizePersonalInfoBackup(value) {
     station_callsign: String(value.station_callsign || '').trim().toUpperCase(),
     operator_class: operatorClass,
     default_qth: normalizeBackupQth(value.default_qth),
+    qso_defaults: normalizeQsoDefaults(schemaVersion >= 4 ? value.qso_defaults : null),
+    callbook_provider: schemaVersion >= 4 && value.callbook_provider === 'qrz' ? 'qrz' : 'hamqth',
+    qrz: { username: schemaVersion >= 4 ? String(value.qrz?.username || '').trim() : '', password: '' },
     hamqth: {
       username: String(value.hamqth?.username || '').trim(),
-      password: String(value.hamqth?.password || '')
+      password: schemaVersion < 3 ? String(value.hamqth?.password || '') : ''
     },
     rig_presets: normalizeRigPresets(value.rig_presets),
     repeaters: value.repeaters.map((item, index) => normalizeBackupRepeater(item, index))
@@ -584,12 +657,15 @@ function optionalPositiveNumber(value, label) {
 async function applyPersonalInfoBackup(backup) {
   setOrRemoveStoredValue('hamlog_station_callsign', backup.station_callsign);
   storeCnOperatorClass(backup.operator_class);
+  localStorage.setItem(QSO_DEFAULTS_KEY, JSON.stringify(backup.qso_defaults));
   if (backup.default_qth) {
     localStorage.setItem('hamlog_default_qth', JSON.stringify(backup.default_qth));
   } else {
     localStorage.removeItem('hamlog_default_qth');
   }
   await saveHamQthCredentials(backup.hamqth.username, backup.hamqth.password);
+  await saveQrzCredentials(backup.qrz.username, '');
+  localStorage.setItem(CALLBOOK_PROVIDER_KEY, backup.callbook_provider);
   localStorage.setItem('hamlog_my_rigs', JSON.stringify(backup.rig_presets));
   sessionStorage.removeItem('hamlog_hamqth_session');
 }
@@ -602,16 +678,18 @@ function setOrRemoveStoredValue(key, value) {
 async function snapshotPersonalInfoSettings() {
   const keys = [
     'hamlog_station_callsign', 'hamlog_default_qth', HAMQTH_USER_HINT_KEY,
-    'hamlog_my_rigs', CN_OPERATOR_CLASS_KEY
+    'hamlog_my_rigs', CN_OPERATOR_CLASS_KEY, QSO_DEFAULTS_KEY,
+    CALLBOOK_PROVIDER_KEY, 'hamlog_qrz_user_hint'
   ];
   return {
     local: keys.map(key => ({ key, value: localStorage.getItem(key) })),
-    credentials: await loadHamQthCredentials()
+    credentials: await loadHamQthCredentials(), qrzCredentials: await loadQrzCredentials()
   };
 }
 
 async function restorePersonalInfoSettings(snapshot) {
   await saveHamQthCredentials(snapshot?.credentials?.username || '', snapshot?.credentials?.password || '');
+  await saveQrzCredentials(snapshot?.qrzCredentials?.username || '', snapshot?.qrzCredentials?.password || '');
   for (const item of snapshot?.local || []) {
     if (item.value == null) localStorage.removeItem(item.key);
     else localStorage.setItem(item.key, item.value);

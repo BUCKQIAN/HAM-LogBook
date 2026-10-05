@@ -12,11 +12,12 @@ import {
   getQsoById,
   deleteQso,
   checkDuplicate,
-  getCounterpartHistory
+  getCounterpartHistory,
+  getAllRepeaters
 } from './db.js';
 import { getCurrentPosition } from './gps.js';
 import { latLngToLocator, isValidLocator, normalizeLocator } from './locator.js';
-import { queryCallsign } from './hamqth.js';
+import { queryCallsign, getCallbookLabel } from './callbook.js';
 import { BAND_CATALOG, detectBandFromFrequency } from './radio.js';
 import {
   getAllowedBandIds,
@@ -28,6 +29,8 @@ import { getSplashStyle, hideNativeSplash, syncNativeSplashStyle } from './splas
 import { hasMeaningfulDraftChanges, hasMeaningfulLegacyDraft } from './qso-draft.js';
 import { clearSecureDraft, loadSecureDraft, saveSecureDraft } from './secure-data.js';
 import { maybeCreateAutomaticBackup } from './automatic-backup.js';
+import { openChoiceDialog, refreshFieldPickers, focusFieldPicker } from './field-picker.js';
+import { readQsoDefaults, repeaterFrequencyOptions } from './station-presets.js';
 
 // ========== 页面状态 ==========
 let isEditMode = false;
@@ -77,6 +80,17 @@ export async function initPage() {
 
   // 加载设备预设列表（从 localStorage）
   loadRigPresets();
+  window.addEventListener('pageshow', event => {
+    if (!event.persisted) return;
+    loadRigPresets();
+    const band = document.getElementById('band').value;
+    renderAllowedBandOptions();
+    ensureStoredBandOption(band, '原填值');
+    document.getElementById('band').value = band;
+    checkRepeaterPreset();
+    refreshFieldPickers();
+    updateLookupButtonState();
+  });
 
   // 新建记录在意外切页、进入后台或重启后都可恢复；编辑既有 QSO 时不使用草稿。
   if (!requestedEditId) await restoreQsoDraft();
@@ -150,12 +164,13 @@ function getUTCTimeFallback() {
 // ========== 设备预设 ==========
 
 function loadRigPresets() {
+  const datalist = document.getElementById('my-rigs-list');
+  datalist?.replaceChildren();
   try {
     const rigsStr = localStorage.getItem('hamlog_my_rigs');
     if (!rigsStr) return;
     const rigs = JSON.parse(rigsStr);
     if (!Array.isArray(rigs) || rigs.length === 0) return;
-    const datalist = document.getElementById('my-rigs-list');
     if (datalist) {
       datalist.replaceChildren();
       rigs.forEach(rig => {
@@ -165,6 +180,53 @@ function loadRigPresets() {
       });
     }
   } catch (e) { /* ignore */ }
+}
+
+function handleDefaultFrequency() {
+  const defaults = readQsoDefaults();
+  if (defaults.frequency === null) {
+    window.showToast('请先在设置 → 台站资料与预设中保存默认频率');
+    return;
+  }
+  document.getElementById('frequency').value = defaults.frequency;
+  applyDetectedBand();
+  markQsoDraftDirty();
+  window.showToast('已填入默认频率');
+}
+
+function handleDefaultEquipment() {
+  const defaults = readQsoDefaults();
+  if (!defaults.rig && defaults.power === null) {
+    window.showToast('请先在设置 → 台站资料与预设中保存默认设备和功率');
+    return;
+  }
+  if (defaults.rig) document.getElementById('my-rig').value = defaults.rig;
+  if (defaults.power !== null) document.getElementById('my-power').value = String(defaults.power);
+  markQsoDraftDirty();
+  window.showToast('已填入默认设备和功率');
+}
+
+async function handleChooseRepeater() {
+  const button = document.getElementById('choose-repeater-btn');
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    await initDatabase();
+    const repeaters = await getAllRepeaters();
+    openChoiceDialog({
+      title: '选择中继台频率',
+      options: repeaterFrequencyOptions(repeaters),
+      emptyMessage: '暂无中继台，请先在中继页面添加',
+      onSelect: frequency => {
+        document.getElementById('frequency').value = frequency;
+        applyDetectedBand();
+        markQsoDraftDirty();
+        window.showToast('已填入中继台频率');
+      }
+    });
+  } catch (error) {
+    window.showToast('读取中继台失败：' + (error.message || '未知错误'));
+  } finally { button.disabled = false; }
 }
 
 // ========== 操作证类别与频段选项 ==========
@@ -291,6 +353,7 @@ function populateForm(qso) {
 
   // 旧记录没有保存网格时，根据经纬度补算。
   if (!qso.my_locator) autoCalcMyLocator();
+  refreshFieldPickers();
 }
 
 function setEditMode(enabled, qsoId = null) {
@@ -301,6 +364,7 @@ function setEditMode(enabled, qsoId = null) {
   const saveBtn = document.getElementById('save-btn');
   const deleteBtn = document.getElementById('delete-btn');
   const clearBtn = document.getElementById('clear-btn');
+  deleteBtn.hidden = !enabled;
 
   if (enabled) {
     saveBtn.innerHTML = '💾 更新 QSO';
@@ -334,6 +398,9 @@ function bindEvents() {
     hideCounterpartProfiles();
   });
   document.getElementById('utc-time-btn').addEventListener('click', handleRefreshUTCTime);
+  document.getElementById('default-frequency-btn')?.addEventListener('click', handleDefaultFrequency);
+  document.getElementById('choose-repeater-btn')?.addEventListener('click', handleChooseRepeater);
+  document.getElementById('default-equipment-btn')?.addEventListener('click', handleDefaultEquipment);
 
   // 频率录入完成后自动识别常用业余频段，仍允许用户手动调整。
   const frequencyInput = document.getElementById('frequency');
@@ -517,6 +584,7 @@ async function restoreQsoDraft() {
     });
     updateRSTPlaceholders();
     draftIsDirty = true;
+    refreshFieldPickers();
     window.showToast('已恢复未保存的 QSO 草稿');
   } catch (error) {
     console.warn('读取加密 QSO 草稿失败:', error);
@@ -640,6 +708,7 @@ function handleClear() {
       el.selectedIndex = 0;
     });
     renderAllowedBandOptions();
+    refreshFieldPickers();
     hideCounterpartProfiles();
     updateRSTPlaceholders();
     setDefaultDateTime();
@@ -656,6 +725,7 @@ function clearForm() {
     el.selectedIndex = 0;
   });
   renderAllowedBandOptions();
+  refreshFieldPickers();
   hideCounterpartProfiles();
   updateRSTPlaceholders();
   setDefaultDateTime();
@@ -862,11 +932,15 @@ async function handleCallsignLookup() {
 
   try {
     const info = await queryCallsign(callsign);
+    if (callsignInput.value.trim().toUpperCase() !== callsign.toUpperCase()) {
+      window.showToast('呼号已变更，请重新查询');
+      return;
+    }
     if (info.name) document.getElementById('op-name').value = info.name;
     if (info.qth) document.getElementById('op-qth').value = info.qth;
     if (info.grid) document.getElementById('op-locator').value = normalizeLocator(info.grid);
     markQsoDraftDirty();
-    window.showToast('查询成功');
+    window.showToast(info.warning ? `已填入资料；${info.warning}` : `${getCallbookLabel()} 查询成功`);
   } catch (error) {
     window.showToast(error.message);
   } finally {
@@ -881,7 +955,9 @@ function updateLookupButtonState() {
   const btn = document.getElementById('lookup-btn');
   if (!btn) return;
   btn.classList.toggle('is-offline', !navigator.onLine);
-  btn.setAttribute('aria-label', navigator.onLine ? '查询 HamQTH 呼号信息' : '当前离线，无法查询呼号');
+  const label = navigator.onLine ? `查询 ${getCallbookLabel()} 呼号信息` : '当前离线，无法查询呼号';
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
 }
 
 function applyDetectedBand() {
@@ -901,6 +977,7 @@ function applyDetectedBand() {
   } else if (!band) {
     lastRestrictedBandWarning = '';
   }
+  refreshFieldPickers();
 }
 
 // ========== 网格自动计算 ==========
@@ -987,17 +1064,17 @@ function validateForm() {
   const band = document.getElementById('band').value;
   if (!mode) {
     window.showToast('请选择通联模式');
-    document.getElementById('mode').focus();
+    focusFieldPicker('mode');
     return false;
   }
   if (!band) {
     window.showToast('请选择频段');
-    document.getElementById('band').focus();
+    focusFieldPicker('band');
     return false;
   }
   if (!isEditMode && !isBandAllowedForNewQso(band, currentOperatorClass)) {
     window.showToast(`${currentOperatorClass} 类不能用该频段新建 QSO，请重新选择`);
-    document.getElementById('band').focus();
+    focusFieldPicker('band');
     return false;
   }
   const rstSent = document.getElementById('rst-sent').value.trim();

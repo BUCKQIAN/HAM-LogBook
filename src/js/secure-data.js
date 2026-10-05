@@ -26,6 +26,28 @@ function normalizeCredentials(value) {
   };
 }
 
+export async function loadQrzCredentials() {
+  const plugin = securePlugin();
+  if (plugin?.getQrzCredentials) return normalizeCredentials(await plugin.getQrzCredentials());
+  if (window.Capacitor?.isNativePlatform?.()) throw new Error('当前安装包不支持 QRZ 安全存储');
+  try { return normalizeCredentials(JSON.parse(sessionStorage.getItem('hamlog_session_qrz_credentials') || 'null')); }
+  catch { return normalizeCredentials(null); }
+}
+
+export async function saveQrzCredentials(username, password) {
+  const credentials = normalizeCredentials({ username, password });
+  const plugin = securePlugin();
+  if (plugin?.setQrzCredentials) await plugin.setQrzCredentials(credentials);
+  else {
+    if (window.Capacitor?.isNativePlatform?.()) throw new Error('当前安装包不支持 QRZ 安全存储');
+    if (credentials.username && credentials.password) sessionStorage.setItem('hamlog_session_qrz_credentials', JSON.stringify(credentials));
+    else sessionStorage.removeItem('hamlog_session_qrz_credentials');
+  }
+  if (credentials.username && !credentials.password) localStorage.setItem('hamlog_qrz_user_hint', credentials.username);
+  else localStorage.removeItem('hamlog_qrz_user_hint');
+  sessionStorage.removeItem('hamlog_qrz_session');
+}
+
 /** 读取凭据，并将旧版本 localStorage 明文一次性迁移到 Android Keystore。 */
 export async function loadHamQthCredentials() {
   const plugin = securePlugin();

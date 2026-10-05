@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com https://xmldata.qrz.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
   <title>HAM Logbook - 新建 QSO</title>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/theme.js"></script>
@@ -27,7 +27,7 @@
       <div class="card-header">
         <span class="card-title">通联时间</span>
       </div>
-      <div class="card-content">
+        <div class="card-content">
         <p class="helper-text">日志日期与时间统一使用 UTC，便于与 ADIF 及国际日志系统互换。</p>
         <div class="field-row">
           <div class="field">
@@ -93,6 +93,10 @@
             <input type="number" id="frequency" step="0.001" inputmode="decimal" placeholder="144.370" min="0">
           </div>
         </div>
+        <div class="btn-row">
+          <button class="btn-small" type="button" id="default-frequency-btn">默认频率</button>
+          <button class="btn-small" type="button" id="choose-repeater-btn">从中继台选择</button>
+        </div>
         <div class="field-row">
           <div class="field">
             <label for="rst-sent">我方发送（RST_SENT）</label>
@@ -147,7 +151,7 @@
             <datalist id="my-rigs-list"></datalist>
           </div>
           <div class="field">
-            <label for="my-power">我的功率</label>
+            <label for="my-power">我的功率 (W)</label>
             <input type="text" id="my-power" autocomplete="off">
           </div>
           <div class="field">
@@ -158,6 +162,7 @@
             </select>
           </div>
         </div>
+        <button class="btn-small btn-wide" type="button" id="default-equipment-btn">使用默认设备和功率</button>
       </div>
     </div>
 
@@ -207,7 +212,7 @@
     <!-- 底部操作区 -->
     <div class="action-bar">
       <button class="btn btn-primary" id="save-btn">💾 保存 QSO</button>
-      <button class="btn btn-danger is-hidden" id="delete-btn">🗑️ 删除 QSO</button>
+      <button class="btn btn-danger" id="delete-btn" hidden>🗑️ 删除 QSO</button>
       <button class="btn btn-secondary" id="clear-btn">清除表单</button>
     </div>
 

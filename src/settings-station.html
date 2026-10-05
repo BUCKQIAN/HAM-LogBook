@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.hamqth.com https://xmldata.qrz.com; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'">
   <title>HAM Logbook - 台站资料</title>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/theme.js"></script>
@@ -39,6 +39,31 @@
             <p class="helper-text">本设置只限制应用中新建 QSO 的频段选项，不替代电台执照载明的频率、功率及当地管理要求。</p>
           </div>
           <button class="btn-small btn-apply" id="save-station-btn">保存台站资料</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>默认频率、设备与功率</h3>
+      <div class="card">
+        <div class="card-content">
+          <p class="helper-text">在记录页点击对应按钮填充；不会自动覆盖正在填写的内容。</p>
+          <div class="field">
+            <label for="default-frequency">默认频率 (MHz)</label>
+            <input type="number" id="default-frequency" min="0" step="any" inputmode="decimal" placeholder="例如 144.370">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="default-rig">默认设备</label>
+              <input type="text" id="default-rig" list="default-rigs-list" maxlength="128" autocomplete="off">
+              <datalist id="default-rigs-list"></datalist>
+            </div>
+            <div class="field">
+              <label for="default-power">默认功率 (W)</label>
+              <input type="number" id="default-power" min="0" step="any" inputmode="decimal" placeholder="例如 5">
+            </div>
+          </div>
+          <button class="btn-small btn-apply" type="button" id="save-qso-defaults-btn">保存通联默认值</button>
         </div>
       </div>
     </div>

@@ -42,3 +42,24 @@ test('个人信息 v3 不要求或恢复 HamQTH 密码', () => {
   assert.equal(normalized.hamqth.username, 'bh4abc');
   assert.equal(normalized.hamqth.password, '');
 });
+
+test('个人信息 v4 保留默认频率、设备功率与查询源，排除两种账号密码', () => {
+  const backup = baseBackup(4);
+  backup.operator_license = { region: 'CN', class: 'A' };
+  backup.qso_defaults = { frequency: 144.37, rig: 'FT-60', power: 5 };
+  backup.callbook_provider = 'qrz';
+  backup.qrz = { username: 'bh4abc', password: 'must-not-restore' };
+  backup.hamqth.password = 'must-not-restore';
+  const normalized = normalizePersonalInfoBackup(backup);
+  assert.deepEqual(normalized.qso_defaults, backup.qso_defaults);
+  assert.equal(normalized.callbook_provider, 'qrz');
+  assert.equal(normalized.qrz.username, 'bh4abc');
+  assert.equal(normalized.qrz.password, '');
+  assert.equal(normalized.hamqth.password, '');
+});
+
+test('旧个人信息备份没有新增预设时恢复为空值，并沿用 HamQTH', () => {
+  const normalized = normalizePersonalInfoBackup(baseBackup(1));
+  assert.deepEqual(normalized.qso_defaults, { frequency: null, rig: '', power: null });
+  assert.equal(normalized.callbook_provider, 'hamqth');
+});

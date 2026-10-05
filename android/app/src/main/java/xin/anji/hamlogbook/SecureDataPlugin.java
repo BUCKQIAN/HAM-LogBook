@@ -35,6 +35,7 @@ public class SecureDataPlugin extends Plugin {
     private static final String KEY_ALIAS = "hamlog_secure_data_key_v1";
     private static final String PREFS_NAME = "hamlog_secure_data_v1";
     private static final String CREDENTIALS_KEY = "hamqth_credentials";
+    private static final String QRZ_CREDENTIALS_KEY = "qrz_credentials";
     private static final String DRAFT_KEY = "qso_draft";
     private static final int GCM_TAG_BITS = 128;
     private static final int IV_LENGTH = 12;
@@ -90,6 +91,42 @@ public class SecureDataPlugin extends Plugin {
             call.resolve(result);
         } catch (Exception error) {
             call.reject("无法读取加密草稿", error);
+        }
+    }
+
+    @PluginMethod
+    public void getQrzCredentials(PluginCall call) {
+        try {
+            String stored = readEncrypted(QRZ_CREDENTIALS_KEY);
+            JSONObject credentials = new JSONObject(stored.isEmpty() ? "{}" : stored);
+            JSObject result = new JSObject();
+            result.put("username", credentials.optString("username", ""));
+            result.put("password", credentials.optString("password", ""));
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("无法读取 QRZ 安全凭据", error);
+        }
+    }
+
+    @PluginMethod
+    public void setQrzCredentials(PluginCall call) {
+        String username = call.getString("username", "").trim();
+        String password = call.getString("password", "");
+        if (username.length() > 128 || password.length() > 1024) {
+            call.reject("QRZ 账号或密码过长");
+            return;
+        }
+        try {
+            if (username.isEmpty() || password.isEmpty()) remove(QRZ_CREDENTIALS_KEY);
+            else {
+                JSONObject credentials = new JSONObject();
+                credentials.put("username", username);
+                credentials.put("password", password);
+                writeEncrypted(QRZ_CREDENTIALS_KEY, credentials.toString());
+            }
+            call.resolve();
+        } catch (Exception error) {
+            call.reject("无法安全保存 QRZ 凭据", error);
         }
     }
 

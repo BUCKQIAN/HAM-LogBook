@@ -8,6 +8,7 @@
 
 import { initDatabase, getQsoPage, getMonthlyCount, getTotalCount, getBandCounts } from './db.js';
 import { BAND_CATALOG } from './radio.js';
+import { refreshFieldPickers } from './field-picker.js';
 
 const HISTORY_PAGE_SIZE = 100;
 const MAX_RENDERED_QSO_ITEMS = 1000;
@@ -74,6 +75,7 @@ function bindSearchEvents() {
       const element = document.getElementById(id);
       if (element) element.value = '';
     });
+    refreshFieldPickers();
     loadQsoList();
   });
 
