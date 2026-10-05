@@ -108,21 +108,6 @@ android/app/build/outputs/apk/debug/app-debug.apk
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### 正式版签名
-
-真实签名材料绝不能提交到 Git。复制 `android/keystore.properties.example` 为 `android/keystore.properties` 后填写本机签名信息，或设置下列环境变量：
-
-```text
-HAMLOG_RELEASE_STORE_FILE
-HAMLOG_RELEASE_STORE_PASSWORD
-HAMLOG_RELEASE_KEY_ALIAS
-HAMLOG_RELEASE_KEY_PASSWORD
-```
-
-缺少完整签名配置时，Release 构建会主动失败，避免误发布错误签名的安装包。
-
-已配置正式密钥后，运行 `./gradlew assembleRelease`。历史 v1.0.0 / v1.1.0 的统一签名重打包可在项目根目录运行 `python3 scripts/rebuild-releases.py`，具体环境和输出位置见 [开发与发布指南](docs/DEVELOPMENT_GUIDE.md)。
-
 ## 🔒 Android 权限
 
 | 权限 | 用途 | 申请方式 |
