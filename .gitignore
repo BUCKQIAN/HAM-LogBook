@@ -5,7 +5,7 @@ node_modules/
 dist/
 build/
 
-# ===== APK 安装包（不传）=====
+# ===== 安装包（不进源码仓库，正式包通过 GitHub Release 附件发布）=====
 *.apk
 *.aab
 
@@ -24,7 +24,29 @@ AGENTS.md
 CLAUDE.md
 CHANGELOG.md
 
-# ===== Capacitor 生成（android/ 是否上传见 XiaobaiDev.md 说明）=====
+# Android 原生工程纳入源码；Capacitor 生成文件由 android/.gitignore 排除。
+
+# ===== 用户通联数据与本地备份（不传）=====
+*.adi
+*.adif
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.bak
+*.backup
+ham-logbook-personal*.json
+hamlogbook-personal-info*.json
+personal-info*.json
+backup/
+backups/
+user-data/
+exports/
+
+# 本机开发工具应位于项目外；若误复制进项目，也不纳入源码。
+/DeveloperTools/
 
 # ===== 系统文件（不传）=====
 .DS_Store
@@ -48,10 +70,25 @@ npm-debug.log*
 keystore.properties
 *.p12
 *.pfx
-*.pem.key
+*.key
+*.pem
+*.p8
+*.pk8
+*.ppk
 *.private
 *.secret
+.ssh/
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+id_ecdsa_sk
+id_ed25519_sk
 android/app/google-services.json
+
+# 仅放行本项目约定名称的公开证书，私钥 PEM 仍被排除。
+!ham-logbook-release-certificate.pem
+!HAM-LogBook-signing-certificate.pem
 
 # ===== 测试与覆盖率产物 =====
 coverage/
