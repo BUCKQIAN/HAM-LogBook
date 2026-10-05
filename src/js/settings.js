@@ -40,7 +40,7 @@ import {
   isEncryptedPersonalInfoBackup
 } from './backup-crypto.js';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const PERSONAL_INFO_FORMAT = 'hamlogbook-personal-info';
 const PERSONAL_INFO_SCHEMA_VERSION = 3;
 const HAMQTH_USER_HINT_KEY = 'hamlog_hamqth_user_hint';

@@ -270,7 +270,7 @@ export function generateADIFHeader() {
     'Ham Radio Logbook Export',
     '<ADIF_VER:5>3.1.4',
     '<PROGRAMID:10>hamlogbook',
-    '<PROGRAMVERSION:5>1.1.0',
+    '<PROGRAMVERSION:5>1.2.0',
     '<EOH>'
   ].join('\r\n');
 }
