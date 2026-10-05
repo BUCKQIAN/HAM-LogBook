@@ -1,4 +1,4 @@
-# HAM Logbook 📡
+# HAM Logbook 📡 业余无线电通联日志 - Android
 
 ### 面向中国业余无线电爱好者的 Android 离线通联日志
 
