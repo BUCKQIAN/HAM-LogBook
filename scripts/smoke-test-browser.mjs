@@ -161,6 +161,23 @@ try {
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('hamlog_qso_defaults')).frequency), 144.37);
   await page.screenshot({ path: `${output}/station-defaults.png`, fullPage: true });
   await go(`${base}/index.html`);
+  // 保持频率输入框焦点，不触发 change/blur，也应即时更新频段及可见选择按钮。
+  for (const [frequency, band] of [['50.500', '6m'], ['144.370', '2m'], ['434.650', '70cm']]) {
+    await page.locator('#frequency').fill(frequency);
+    assert.equal(await page.locator('#frequency').evaluate(input => input === document.activeElement), true);
+    assert.equal(await page.locator('#band').inputValue(), band);
+    assert.equal(await page.getByRole('button', { name: `频段：${band}`, exact: true }).count(), 1);
+  }
+  await page.locator('#frequency').fill('');
+  await page.locator('#frequency').pressSequentially('144.370');
+  assert.equal(await page.locator('#band').inputValue(), '2m');
+  assert.equal(await page.locator('#toast').textContent().then(value => value.includes('不在当前')), false);
+  await page.evaluate(() => localStorage.setItem('hamlog_operator_class_cn', 'B'));
+  await go(`${base}/index.html`);
+  await page.locator('#frequency').fill('14.270');
+  assert.equal(await page.locator('#band').inputValue(), '20m');
+  await page.evaluate(() => localStorage.setItem('hamlog_operator_class_cn', 'A'));
+  await go(`${base}/index.html`);
   await page.locator('#default-frequency-btn').click();
   assert.equal(await page.locator('#frequency').inputValue(), '144.37');
   assert.equal(await page.locator('#band').inputValue(), '2m');
@@ -357,7 +374,7 @@ try {
     if (width !== 768) await page.locator('.card').nth(1).screenshot({ path: `${output}/signal-shortcuts-${width}.png` });
   }
   assert.deepEqual(errors, []);
-  console.log('浏览器回归通过：设置主页固定布局与小屏可访问性、主题/启动样式同步和就绪顺序、默认值和优秀信号、中继编辑与应用、三轮跨页选择、HamQTH/QRZ 模拟查询、320/390/768px 布局。');
+  console.log('浏览器回归通过：频率输入即时识别HF/VHF/UHF且中间值不弹提示、设置主页与安全区、主题/启动样式同步和就绪顺序、默认值和优秀信号、中继编辑与应用、三轮跨页选择、HamQTH/QRZ 模拟查询、320/390/768px 布局。');
 } catch (error) {
   if (activePage) {
     console.error(await activePage.evaluate(() => ({

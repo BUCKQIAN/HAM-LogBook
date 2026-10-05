@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebSettings;
@@ -19,12 +20,12 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    private static final long SPLASH_FALLBACK_MS = 3500L;
     private static final long SYSTEM_SPLASH_READY_FALLBACK_MS = 800L;
     private static final long SPLASH_EXIT_MS = 100L;
 
     private NativeSplashView nativeSplashView;
     private Handler splashHandler;
+    private SelectedSplashGate selectedSplashGate;
     private String splashStyle = "A";
     private String webTheme = "day";
     private boolean systemSplashReady;
@@ -32,29 +33,40 @@ public class MainActivity extends BridgeActivity {
     private boolean webContentReady;
     private boolean visualStatePending;
     private boolean destroyed;
-    private final Runnable splashFallback = this::releaseSplash;
+    private boolean selectedSplashDrawn;
+    private boolean systemExitStarted;
+    private boolean systemSplashDismissed;
+    private final Runnable splashFallback = this::dismissSelectedSplash;
+    private final Runnable selectedSplashExit = this::dismissSelectedSplash;
     private final Runnable systemSplashReadyFallback = () -> systemSplashReady = true;
-    private final Runnable splashTransitionFallback = this::finishSplashTransition;
+    private final Runnable selectedSplashVisibleFallback = () -> {
+        // 有些启动来源不会展示系统启动页，也不会调用退出监听。
+        if (!systemExitStarted) markSelectedSplashVisible();
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         splashStyle = NativeSplashPlugin.getSavedStyle(this);
         webTheme = NativeSplashPlugin.getSavedTheme(this);
         splashHandler = new Handler(Looper.getMainLooper());
+        selectedSplashGate = new SelectedSplashGate(SystemClock.uptimeMillis());
 
-        // Android 12+ 的系统启动窗口已使用所选方案，不再叠加第二个启动页。
-        boolean useSystemSplash = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
-        if (useSystemSplash) setTheme(NativeSplashPlugin.getSystemSplashTheme(splashStyle));
+        // 系统窗口先与所选方案匹配，随后交接到完整的用户启动画面。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            setTheme(NativeSplashPlugin.getSystemSplashTheme(splashStyle));
+        }
         SplashScreen systemSplash = SplashScreen.installSplashScreen(this);
         systemSplash.setKeepOnScreenCondition(() -> !systemSplashReady);
         systemSplash.setOnExitAnimationListener(provider -> {
+            systemExitStarted = true;
             // Android 12/12L 的兼容库在此回调前会重设系统栏，恢复当前颜色与图标。
             applyCurrentSystemBars();
             provider.getView().animate().alpha(0f).setDuration(SPLASH_EXIT_MS)
                 .withEndAction(() -> {
                     provider.remove();
-                    if (useSystemSplash && webContentReady) finishSplashTransition();
-                    else applyCurrentSystemBars();
+                    systemSplashDismissed = true;
+                    markSelectedSplashVisible();
+                    applyCurrentSystemBars();
                 }).start();
         });
 
@@ -65,15 +77,21 @@ public class MainActivity extends BridgeActivity {
         hardenWebView();
         NativeSplashPlugin.applySystemSplashTheme(this, splashStyle);
 
-        if (!useSystemSplash) showLegacySplash();
+        showSelectedSplash();
         applyCurrentSystemBars();
         // Capacitor 内置 SystemBars 初始化会排队重设外观，在其完成后再恢复本应用设置。
         getWindow().getDecorView().post(this::applyCurrentSystemBars);
-        splashHandler.postDelayed(splashFallback, SPLASH_FALLBACK_MS);
+        splashHandler.postDelayed(splashFallback, SelectedSplashGate.TIMEOUT_MS);
     }
 
-    private void showLegacySplash() {
+    private void showSelectedSplash() {
         nativeSplashView = new NativeSplashView(this, splashStyle);
+        nativeSplashView.setFirstDrawCallback(() -> {
+            if (destroyed) return;
+            selectedSplashDrawn = true;
+            if (systemSplashDismissed) markSelectedSplashVisible();
+            else splashHandler.postDelayed(selectedSplashVisibleFallback, SPLASH_EXIT_MS + 150L);
+        });
         nativeSplashView.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
             @Override
             public void onLayoutChange(View view, int left, int top, int right, int bottom,
@@ -110,7 +128,7 @@ public class MainActivity extends BridgeActivity {
 
     public void hideNativeSplash() {
         runOnUiThread(() -> {
-            if (destroyed || webContentReady || visualStatePending) return;
+            if (destroyed || !splashActive || webContentReady || visualStatePending) return;
             if (getBridge() == null || getBridge().getWebView() == null) {
                 releaseSplash();
                 return;
@@ -129,11 +147,33 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void releaseSplash() {
-        if (destroyed || webContentReady) return;
+        if (destroyed || !splashActive || webContentReady) return;
         webContentReady = true;
+        selectedSplashGate.onPageReady();
+        scheduleSelectedSplashExit();
+    }
+
+    private void markSelectedSplashVisible() {
+        if (destroyed || !selectedSplashDrawn || nativeSplashView == null) return;
+        selectedSplashGate.onFrameVisible(SystemClock.uptimeMillis());
+        scheduleSelectedSplashExit();
+    }
+
+    private void scheduleSelectedSplashExit() {
+        splashHandler.removeCallbacks(selectedSplashExit);
+        long remaining = selectedSplashGate.remainingMillis(SystemClock.uptimeMillis());
+        if (remaining < 0L) return;
+        if (remaining == 0L) dismissSelectedSplash();
+        else splashHandler.postDelayed(selectedSplashExit, remaining);
+    }
+
+    private void dismissSelectedSplash() {
+        if (destroyed || !splashActive) return;
         systemSplashReady = true;
         splashHandler.removeCallbacks(systemSplashReadyFallback);
         splashHandler.removeCallbacks(splashFallback);
+        splashHandler.removeCallbacks(selectedSplashExit);
+        splashHandler.removeCallbacks(selectedSplashVisibleFallback);
         getWindow().getDecorView().invalidate();
 
         if (nativeSplashView != null) {
@@ -145,14 +185,12 @@ public class MainActivity extends BridgeActivity {
                 finishSplashTransition();
             }).start();
         } else {
-            // 某些热恢复/启动来源不展示系统启动页，也就不会触发退出监听。
-            splashHandler.postDelayed(splashTransitionFallback, SPLASH_EXIT_MS + 150L);
+            finishSplashTransition();
         }
     }
 
     private void finishSplashTransition() {
         if (destroyed) return;
-        splashHandler.removeCallbacks(splashTransitionFallback);
         splashActive = false;
         applyCurrentSystemBars();
     }

@@ -408,8 +408,9 @@ function bindEvents() {
   document.getElementById('default-equipment-btn')?.addEventListener('click', handleDefaultEquipment);
   document.getElementById('excellent-signal-btn')?.addEventListener('click', handleExcellentSignal);
 
-  // 频率录入完成后自动识别常用业余频段，仍允许用户手动调整。
+  // 输入时即时识别频段；中间输入值不弹类别提示，完成录入后再提示。
   const frequencyInput = document.getElementById('frequency');
+  frequencyInput.addEventListener('input', () => applyDetectedBand({ warnOnRestricted: false }));
   frequencyInput.addEventListener('change', applyDetectedBand);
   frequencyInput.addEventListener('blur', applyDetectedBand);
 
@@ -966,7 +967,7 @@ function updateLookupButtonState() {
   btn.title = label;
 }
 
-function applyDetectedBand() {
+function applyDetectedBand({ warnOnRestricted = true } = {}) {
   const frequency = document.getElementById('frequency')?.value;
   const band = detectBandFromFrequency(frequency);
   const bandSelect = document.getElementById('band');
@@ -976,7 +977,7 @@ function applyDetectedBand() {
     lastRestrictedBandWarning = '';
   } else if (band && !isEditMode && !isBandAllowedForNewQso(band, currentOperatorClass)) {
     bandSelect.value = '';
-    if (lastRestrictedBandWarning !== band) {
+    if (warnOnRestricted && lastRestrictedBandWarning !== band) {
       lastRestrictedBandWarning = band;
       window.showToast(`${band} 不在当前 ${currentOperatorClass} 类的新建频段选项中`);
     }

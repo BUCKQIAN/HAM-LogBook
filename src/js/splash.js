@@ -1,6 +1,6 @@
 /* ============================================================
    splash.js - Android 原生启动页设置桥接
-   Android 12+ 使用单层系统启动页；较旧系统使用 NativeSplashView 兼容显示。
+   系统启动窗口交接到 NativeSplashView，完整显示用户选择的启动方案。
    ============================================================ */
 
 export const SPLASH_STYLE_KEY = 'hamlog_splash_style';

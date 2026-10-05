@@ -16,6 +16,11 @@ public class NativeSplashView extends View {
     private final String style;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final float density;
+    private Runnable firstDrawCallback;
+
+    void setFirstDrawCallback(Runnable callback) {
+        firstDrawCallback = callback;
+    }
 
     /** 供 Android 布局工具和预览实例化；运行时会使用带 style 的构造器。 */
     public NativeSplashView(Context context) {
@@ -52,6 +57,11 @@ public class NativeSplashView extends View {
             case "D": drawNightStation(canvas, cx, cy); break;
             case "E": drawLogbookPage(canvas, cx, cy); break;
             default: drawPaperAndInk(canvas, cx, cy); break;
+        }
+        if (firstDrawCallback != null) {
+            Runnable callback = firstDrawCallback;
+            firstDrawCallback = null;
+            post(callback);
         }
     }
 
