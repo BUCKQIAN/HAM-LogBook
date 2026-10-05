@@ -25,7 +25,7 @@
     <!-- 添加/编辑中继台表单 -->
     <div class="card" id="repeater-form">
       <div class="card-header">
-        <span class="card-title">中继台信息</span>
+        <span class="card-title" id="repeater-form-title">添加中继台</span>
       </div>
       <div class="card-content">
         <div class="field">
@@ -93,8 +93,8 @@
           <textarea id="repeater-notes" rows="2" placeholder="例如：仅周末开放；覆盖市区"></textarea>
         </div>
         <div class="btn-inline-row">
-          <button class="btn-small btn-apply" id="repeater-save-btn">添加</button>
-          <button class="btn-small is-hidden" id="repeater-cancel-btn">取消</button>
+          <button class="btn-small btn-apply" type="button" id="repeater-save-btn">添加</button>
+          <button class="btn-small" type="button" id="repeater-cancel-btn" hidden>取消编辑</button>
         </div>
       </div>
     </div>

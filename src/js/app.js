@@ -206,6 +206,13 @@ function handleDefaultEquipment() {
   window.showToast('已填入默认设备和功率');
 }
 
+function handleExcellentSignal() {
+  document.getElementById('rst-sent').value = '59';
+  document.getElementById('rst-rcvd').value = '59';
+  markQsoDraftDirty();
+  window.showToast('我方发送和接收信号已填入 59');
+}
+
 async function handleChooseRepeater() {
   const button = document.getElementById('choose-repeater-btn');
   if (button.disabled) return;
@@ -401,6 +408,7 @@ function bindEvents() {
   document.getElementById('default-frequency-btn')?.addEventListener('click', handleDefaultFrequency);
   document.getElementById('choose-repeater-btn')?.addEventListener('click', handleChooseRepeater);
   document.getElementById('default-equipment-btn')?.addEventListener('click', handleDefaultEquipment);
+  document.getElementById('excellent-signal-btn')?.addEventListener('click', handleExcellentSignal);
 
   // 频率录入完成后自动识别常用业余频段，仍允许用户手动调整。
   const frequencyInput = document.getElementById('frequency');

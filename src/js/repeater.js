@@ -114,8 +114,9 @@ function resetForm() {
   });
   const saveBtn = document.getElementById('repeater-save-btn');
   if (saveBtn) saveBtn.textContent = '添加';
+  document.getElementById('repeater-form-title').textContent = '添加中继台';
   const cancelBtn = document.getElementById('repeater-cancel-btn');
-  if (cancelBtn) cancelBtn.style.display = 'none';
+  if (cancelBtn) cancelBtn.hidden = true;
 }
 
 function startEdit(repeater) {
@@ -128,10 +129,12 @@ function startEdit(repeater) {
   document.getElementById('repeater-location').value = repeater.location || '';
   document.getElementById('repeater-notes').value = repeater.notes || '';
   const saveBtn = document.getElementById('repeater-save-btn');
-  if (saveBtn) saveBtn.textContent = '更新';
+  if (saveBtn) saveBtn.textContent = '保存修改';
+  document.getElementById('repeater-form-title').textContent = '编辑中继台';
   const cancelBtn = document.getElementById('repeater-cancel-btn');
-  if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+  if (cancelBtn) cancelBtn.hidden = false;
   document.getElementById('repeater-form')?.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('repeater-name')?.focus({ preventScroll: true });
 }
 
 async function loadRepeaterList() {
@@ -157,8 +160,9 @@ async function loadRepeaterList() {
           <div class="repeater-item-meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join('')}</div>
         </div>
         <div class="repeater-item-actions">
-          <button class="btn-small btn-apply" data-repeater-action="apply" data-repeater-id="${r.id}">应用</button>
-          <button class="btn-small btn-delete" data-repeater-action="delete" data-repeater-id="${r.id}">删除</button>
+          <button class="btn-small" type="button" data-repeater-action="edit" data-repeater-id="${r.id}">编辑</button>
+          <button class="btn-small btn-apply" type="button" data-repeater-action="apply" data-repeater-id="${r.id}">应用</button>
+          <button class="btn-small btn-delete" type="button" data-repeater-action="delete" data-repeater-id="${r.id}">删除</button>
         </div>
       </div>`;
     }).join('');
@@ -181,6 +185,7 @@ async function removeRepeater(repeater) {
   if (!confirm('确定要删除此中继台吗？')) return;
   try {
     await deleteRepeater(repeater.id);
+    if (Number(editRepeaterId) === Number(repeater.id)) resetForm();
     window.showToast('已删除');
     await loadRepeaterList();
   } catch (error) {

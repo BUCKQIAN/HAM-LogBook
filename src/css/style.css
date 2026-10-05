@@ -298,6 +298,9 @@ input[type="file"] { height: auto; padding: 8px; }
 .btn-row, .btn-inline-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn-inline-row.no-wrap { flex-wrap: nowrap; }
 .btn-wide { width: 100%; }
+.signal-shortcuts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.signal-shortcuts .btn-small { min-width: 0; padding-inline: 4px; }
+#repeater-form { scroll-margin-top: calc(var(--header-height) + 12px); }
 .search-actions { justify-content: flex-end; }
 
 .folder-picker-row { display: flex; align-items: stretch; gap: 8px; }
